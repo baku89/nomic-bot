@@ -20,8 +20,8 @@ export type ActiveProposal = z.infer<typeof activeProposalSchema>;
 export const pendingEndSchema = z.object({
   initiated_by: z.string().default(''),
   initiated_by_username: z.string().default(''),
-  winner_id: z.string().nullable(),
-  winner_mention: z.string().nullable(),
+  winner_id: z.string().nullable().default(null),
+  winner_mention: z.string().nullable().default(null),
   winner_username: z.string().default(''),
   reason: z.string(),
   confirm_message_id: z.string().default(''),
