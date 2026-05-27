@@ -5,6 +5,19 @@ import { handleInteraction } from './commands/index.js';
 import { reportHandlerError } from './error-handler.js';
 import { handleVoteReaction } from './reactions.js';
 
+export function logError(tag: string, err: unknown): void {
+  if (err instanceof Error) {
+    console.error(`${tag} error: ${err.message}`);
+    if (err.stack) console.error(err.stack);
+  } else {
+    try {
+      console.error(`${tag} error:`, String(err));
+    } catch {
+      console.error(`${tag} error: <unserialisable>`);
+    }
+  }
+}
+
 export function createDiscordClient(config: Config): Client {
   const client = new Client({
     intents: [
@@ -37,7 +50,7 @@ export function createDiscordClient(config: Config): Client {
     try {
       await handleMention(message, config);
     } catch (err) {
-      console.error('[mention-handler] error:', err);
+      logError('[mention-handler]', err);
       await reportHandlerError(err, message, config);
     }
   });
@@ -46,7 +59,7 @@ export function createDiscordClient(config: Config): Client {
     try {
       await handleVoteReaction(reaction, user, config);
     } catch (err) {
-      console.error('[reaction-handler] error:', err);
+      logError('[reaction-handler]', err);
     }
   };
   client.on(Events.MessageReactionAdd, onReaction);
@@ -57,7 +70,7 @@ export function createDiscordClient(config: Config): Client {
     try {
       await handleInteraction(interaction, config);
     } catch (err) {
-      console.error('[interaction-handler] error:', err);
+      logError('[interaction-handler]', err);
       if (interaction.replied || interaction.deferred) return;
       await interaction.reply({ content: 'エラーが発生しました', ephemeral: true });
     }
