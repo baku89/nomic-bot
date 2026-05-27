@@ -3,7 +3,14 @@ import type { Config } from '../config.js';
 import { createLLMProvider } from '../llm/index.js';
 import { llmResponseSchema, type Action } from '../llm/actions.js';
 import { buildMentionSystemPrompt } from '../llm/prompts.js';
-import { findGameByChannel, judgeFor, writeGame, type Game } from '../game/state.js';
+import {
+  findGameByChannel,
+  judgeForFallback,
+  participantById,
+  writeGame,
+  type Game,
+} from '../game/state.js';
+import { evaluateJudge } from '../llm/rule-engine.js';
 import { postEndConfirmation } from './end-confirmation.js';
 import { startGameAndAnnounce } from './game-start.js';
 import { buildProposalMessageContent } from './proposal-message.js';
@@ -13,9 +20,8 @@ import { postDispute } from './dispute.js';
 
 export async function handleMention(message: Message, config: Config): Promise<void> {
   const existingGame = findGameByChannel(config.gamesDir, message.channelId);
-  const gameContext = existingGame ? buildGameContext(existingGame) : null;
-
   const llm = createLLMProvider(config);
+  const gameContext = existingGame ? await buildGameContext(existingGame, llm) : null;
   const result = await llm.generate({
     systemPrompt: buildMentionSystemPrompt({
       botDisplayName: config.botDisplayName,
@@ -80,20 +86,33 @@ async function executeAction(
       await handleAmendProposal(action, message, ctx.existingGame, config);
       break;
     case 'raise_dispute':
-      await handleRaiseDispute(action, message, ctx.existingGame);
+      await handleRaiseDispute(action, message, ctx.existingGame, config);
       break;
   }
 }
 
-function buildGameContext(game: Game): string {
+async function buildGameContext(
+  game: Game,
+  llm: import('../llm/provider.js').LLMProvider,
+): Promise<string> {
   const lines = [
     `ゲーム名: ${game.name}`,
     `ステータス: ${game.frontmatter.status}`,
     `参加者数: ${game.participants.length}`,
     `現在の手番: ${game.frontmatter.current_turn ? `<@${game.frontmatter.current_turn}>` : 'なし'}`,
   ];
-  const judge = judgeFor(game);
-  if (judge) lines.push(`現在の裁定者 (Rule 109): <@${judge.discordId}>`);
+  let judgeId: string | null = null;
+  try {
+    const res = await evaluateJudge(llm, game);
+    if (res.player_id && participantById(game, res.player_id)) judgeId = res.player_id;
+  } catch {
+    /* fallback below */
+  }
+  if (!judgeId) {
+    const fb = judgeForFallback(game);
+    if (fb) judgeId = fb.discordId;
+  }
+  if (judgeId) lines.push(`現在の裁定者: <@${judgeId}>`);
   if (game.frontmatter.active_proposal) {
     const p = game.frontmatter.active_proposal;
     lines.push('進行中の提案:');
@@ -189,6 +208,7 @@ async function handleRaiseDispute(
   action: Extract<Action, { type: 'raise_dispute' }>,
   message: Message,
   existingGame: Game | null,
+  config: Config,
 ): Promise<void> {
   if (!message.channel.isSendable()) return;
   if (!existingGame) {
@@ -200,6 +220,7 @@ async function handleRaiseDispute(
     game: existingGame,
     initiator: { mention: `<@${message.author.id}>` },
     reason: action.reason,
+    llm: createLLMProvider(config),
   });
 }
 

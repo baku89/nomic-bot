@@ -161,26 +161,29 @@ export function findParticipantIndex(game: Game, discordId: string | null): numb
   return game.participants.findIndex((p) => p.discordId === discordId);
 }
 
-export function rightNeighborOf(game: Game, discordId: string): Participant | null {
+export function rightNeighborOfFallback(game: Game, discordId: string): Participant | null {
   const i = findParticipantIndex(game, discordId);
   if (i === -1 || game.participants.length === 0) return null;
   return game.participants[(i + 1) % game.participants.length] ?? null;
 }
 
-export function judgeFor(game: Game): Participant | null {
+export function judgeForFallback(game: Game): Participant | null {
   if (!game.frontmatter.current_turn) return null;
-  return rightNeighborOf(game, game.frontmatter.current_turn);
+  return rightNeighborOfFallback(game, game.frontmatter.current_turn);
 }
 
-export function nextTurnPlayer(game: Game): Participant | null {
+export function nextTurnPlayerFallback(game: Game): Participant | null {
   if (!game.frontmatter.current_turn) return null;
-  return rightNeighborOf(game, game.frontmatter.current_turn);
+  return rightNeighborOfFallback(game, game.frontmatter.current_turn);
 }
 
-export function advanceTurn(game: Game): void {
-  const next = nextTurnPlayer(game);
-  game.frontmatter.current_turn = next?.discordId ?? null;
+export function setNextTurn(game: Game, nextPlayerId: string | null): void {
+  game.frontmatter.current_turn = nextPlayerId;
   game.frontmatter.active_proposal = null;
+}
+
+export function participantById(game: Game, discordId: string): Participant | null {
+  return game.participants.find((p) => p.discordId === discordId) ?? null;
 }
 
 export function endGame(

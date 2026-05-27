@@ -6,10 +6,13 @@ import {
   createNewGame,
   writeGame,
   mentionOf,
-  judgeFor,
+  judgeForFallback,
+  participantById,
   type Participant,
   type Game,
 } from '../game/state.js';
+import { createLLMProvider } from '../llm/index.js';
+import { evaluateJudge } from '../llm/rule-engine.js';
 import { GitGameRepo } from '../git/commit.js';
 import { getGamesRepoUrl, gameFileUrl } from '../game/repo-url.js';
 import { setChannelGame } from '../game/channel-cache.js';
@@ -81,8 +84,20 @@ export async function startGameAndAnnounce(opts: {
   const repoUrl = await getGamesRepoUrl(opts.config.gamesDir);
   const gameUrl = repoUrl ? gameFileUrl(repoUrl, game.fileStem, false) : null;
 
-  const judge = judgeFor(game);
-  const judgeMention = judge ? mentionOf(judge) : null;
+  let judgeMention: string | null = null;
+  try {
+    const llm = createLLMProvider(opts.config);
+    const res = await evaluateJudge(llm, game);
+    if (res.player_id && participantById(game, res.player_id)) {
+      judgeMention = `<@${res.player_id}>`;
+    }
+  } catch (err) {
+    console.error('[rule-engine] evaluateJudge failed at start:', err);
+  }
+  if (!judgeMention) {
+    const fb = judgeForFallback(game);
+    if (fb) judgeMention = mentionOf(fb);
+  }
 
   const announcement = buildOpeningAnnouncement({
     gameName: game.name,

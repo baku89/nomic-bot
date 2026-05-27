@@ -10,9 +10,11 @@ import {
   findGameByChannel,
   readGame,
   writeGame,
-  advanceTurn,
+  setNextTurn,
   endGame,
-  judgeFor,
+  judgeForFallback,
+  nextTurnPlayerFallback,
+  participantById,
   type Game,
 } from '../game/state.js';
 import { applyProposal } from '../game/rule-mutations.js';
@@ -21,6 +23,11 @@ import { formatDeadlineJST, hoursFromNow } from '../utils/time.js';
 import { createLLMProvider } from '../llm/index.js';
 import { checkForWinner } from '../llm/win-check.js';
 import { checkForContradictions } from '../llm/contradiction-check.js';
+import {
+  evaluateTally,
+  evaluateJudge,
+  evaluateNextTurn,
+} from '../llm/rule-engine.js';
 import { postEndConfirmation } from './end-confirmation.js';
 import { postDispute } from './dispute.js';
 import { getGamesRepoUrl, gameFileUrl } from '../game/repo-url.js';
@@ -71,18 +78,26 @@ async function tallyAndMaybeFinalize(
   config: Config,
 ): Promise<void> {
   const votes = await collectVotes(message, game);
+  const proposal = game.frontmatter.active_proposal!;
 
-  const allVoted = Object.values(votes).every((v) => v !== 'not_voted');
-  if (!allVoted) {
+  const llm = createLLMProvider(config);
+  let tally;
+  try {
+    tally = await evaluateTally(llm, game, proposal, votes);
+  } catch (err) {
+    console.error('[rule-engine] evaluateTally failed:', err);
     return;
   }
+
+  if (tally.state === 'pending') {
+    return;
+  }
+
+  const approved = tally.state === 'passed';
 
   const noCount = Object.values(votes).filter((v) => v === 'no').length;
   const yesCount = Object.values(votes).filter((v) => v === 'yes').length;
   const abstainCount = Object.values(votes).filter((v) => v === 'abstain').length;
-
-  const approved = noCount === 0 && yesCount > 0;
-  const proposal = game.frontmatter.active_proposal!;
 
   let updatedGame = readGame(config.gamesDir, game.fileStem);
   let commitMessage = '';
@@ -106,7 +121,20 @@ async function tallyAndMaybeFinalize(
     commitMessage = formatCommitMessage(proposal, votes, false, null);
   }
 
-  advanceTurn(updatedGame);
+  let nextPlayerId: string | null = null;
+  try {
+    const res = await evaluateNextTurn(llm, updatedGame);
+    if (res.player_id && participantById(updatedGame, res.player_id)) {
+      nextPlayerId = res.player_id;
+    }
+  } catch (err) {
+    console.error('[rule-engine] evaluateNextTurn failed, fallback:', err);
+  }
+  if (!nextPlayerId) {
+    const fb = nextTurnPlayerFallback(updatedGame);
+    nextPlayerId = fb?.discordId ?? null;
+  }
+  setNextTurn(updatedGame, nextPlayerId);
   writeGame(config.gamesDir, updatedGame);
 
   const repo = new GitGameRepo(config.gamesDir);
@@ -119,28 +147,40 @@ async function tallyAndMaybeFinalize(
     if (approved && appliedRuleNumber !== null) {
       const opVerb = proposal.op === 'enact' ? '制定' : proposal.op === 'modify' ? '修正' : '廃止';
       lines.push(`✅ **採択** — ${proposal.interpretation} ${tallyText}`);
-      lines.push(`Rule ${appliedRuleNumber} を${opVerb}しました (Rule 106 により即時発効)。`);
+      lines.push(`Rule ${appliedRuleNumber} を${opVerb}しました。`);
+      lines.push(`(判定根拠: ${tally.reason})`);
     } else {
       lines.push(`❌ **否決** — ${proposal.interpretation} ${tallyText}`);
+      lines.push(`(判定根拠: ${tally.reason})`);
     }
-    const nextPlayerId = updatedGame.frontmatter.current_turn;
-    if (nextPlayerId) {
+    const turnPlayerId = updatedGame.frontmatter.current_turn;
+    if (turnPlayerId) {
       const nextDeadline = formatDeadlineJST(hoursFromNow(24));
-      const judge = judgeFor(updatedGame);
+      let judgeId: string | null = null;
+      try {
+        const res = await evaluateJudge(llm, updatedGame);
+        if (res.player_id && participantById(updatedGame, res.player_id)) {
+          judgeId = res.player_id;
+        }
+      } catch {
+        /* fallback */
+      }
+      if (!judgeId) {
+        const fb = judgeForFallback(updatedGame);
+        judgeId = fb?.discordId ?? null;
+      }
       lines.push('');
       lines.push(
-        `<@${nextPlayerId}> さん、あなたの手番です。**24時間以内 (${nextDeadline} まで)** に \`/propose <提案文>\` で提案してください。`,
+        `<@${turnPlayerId}> さん、あなたの手番です。**24時間以内 (${nextDeadline} まで)** に \`/propose <提案文>\` で提案してください。`,
       );
-      if (judge) {
-        lines.push(`今手番の裁定者 (Rule 109): <@${judge.discordId}>`);
+      if (judgeId) {
+        lines.push(`今手番の裁定者: <@${judgeId}>`);
       }
     }
     await message.channel.send(lines.join('\n'));
   }
 
   if (approved && message.channel.isSendable()) {
-    const llm = createLLMProvider(config);
-
     try {
       const winCheck = await checkForWinner(llm, updatedGame);
       if (winCheck.game_should_end) {
@@ -170,6 +210,7 @@ async function tallyAndMaybeFinalize(
           initiator: 'bot',
           reason: '直近のルール改変により、ルールセットに矛盾が生じている可能性を検出しました。',
           conflictsBlock: `**検出された矛盾**:\n${conflictsBlock}${contradiction.notes ? `\n\n所見: ${contradiction.notes}` : ''}`,
+          llm,
         });
       }
     } catch (err) {

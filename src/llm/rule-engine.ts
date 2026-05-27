@@ -1,0 +1,128 @@
+import { z } from 'zod';
+import type { LLMProvider } from './provider.js';
+import type { Game } from '../game/state.js';
+import type { ActiveProposal } from '../game/frontmatter.js';
+
+const tallyResultSchema = z.object({
+  state: z.enum(['pending', 'passed', 'rejected']),
+  reason: z.string(),
+});
+export type TallyResult = z.infer<typeof tallyResultSchema>;
+
+const playerResultSchema = z.object({
+  player_id: z.string().nullable(),
+  reason: z.string(),
+});
+export type PlayerResult = z.infer<typeof playerResultSchema>;
+
+function rulesText(game: Game): string {
+  return game.rules.map((r) => `- ${r}`).join('\n');
+}
+
+function participantsText(game: Game): string {
+  return game.participants
+    .map((p) => `- ID: ${p.discordId}, username: @${p.username || '(unknown)'}`)
+    .join('\n');
+}
+
+export async function evaluateTally(
+  llm: LLMProvider,
+  game: Game,
+  proposal: ActiveProposal,
+  votes: Record<string, 'yes' | 'no' | 'abstain' | 'not_voted'>,
+): Promise<TallyResult> {
+  const votesText = Object.entries(votes)
+    .map(([id, v]) => `- ${id}: ${v}`)
+    .join('\n');
+  const systemPrompt = `あなたはノミック (Nomic) ゲームの採決を判定する役割です。
+現行のルールセットと投票状況を見て、提案の状態を判定してください。
+
+判定値 (state):
+- 'pending': まだ投票が完了していない、または採決条件を満たすか判断できない
+- 'passed': 現行ルールの採決条件を満たし、採択された
+- 'rejected': 現行ルールから採択不可能であると確定した (例: 反対票が一定数集まり覆せない)
+
+判定基準:
+- どのルール (Rule 番号) に基づいて判定したか reason に明示する
+- 投票資格者は現行ルールが規定する (例: Rule 107 が「全員1票」なら全員)
+- 採決基準は現行ルールが規定する (例: Rule 105 が「全会一致」など)
+- 棄権 (abstain) の扱いがルールで明示されていない場合は、暫定処置として「棄権者を除く残り全員が yes なら採択」とする
+- 提案者の投票についてもルールが明示する場合のみそれに従う (Rule 107 が「全員1票」のままなら提案者も含む)
+
+参加者:
+${participantsText(game)}
+
+現行の全ルール:
+${rulesText(game)}
+
+提案 (Proposal):
+- 提案者 Discord ID: ${proposal.proposer_id}
+- 解釈: ${proposal.interpretation}
+- 操作: ${proposal.op}
+- 対象ルール番号: ${proposal.target_rule_number ?? '(新規)'}
+- 新本文: ${proposal.new_rule_text ?? '(なし)'}
+
+現在の投票 (Discord User ID: choice):
+${votesText}
+
+注意:
+- 'not_voted' は未投票
+- 採決条件は**必ず現行ルールに基づくこと**。Bot のハードコード挙動 (全会一致) に盲従しない
+- 迷う場合は 'pending' (誤判定で勝手に採択/否決するより、待つ方がコストが低い)`;
+
+  return llm.generate({
+    systemPrompt,
+    userMessage: '現在の状況での採決判定を返してください。',
+    schema: tallyResultSchema,
+  });
+}
+
+export async function evaluateJudge(llm: LLMProvider, game: Game): Promise<PlayerResult> {
+  if (!game.frontmatter.current_turn || game.participants.length === 0) {
+    return { player_id: null, reason: '手番プレイヤーまたは参加者が存在しません' };
+  }
+  const systemPrompt = `あなたはノミック (Nomic) ゲームの裁定者を判定する役割です。
+現行ルールに従い、現在の手番プレイヤーに対する裁定者の Discord User ID を返してください。
+
+- player_id: 裁定者の Discord User ID (参加者リストに含まれること)。判定不能なら null
+- reason: どのルール (Rule 番号) に基づいて裁定者を決めたか
+
+参加者 (リスト順):
+${participantsText(game)}
+
+現行の全ルール:
+${rulesText(game)}
+
+現在の手番プレイヤー Discord User ID: ${game.frontmatter.current_turn}`;
+
+  return llm.generate({
+    systemPrompt,
+    userMessage: '現在の手番プレイヤーに対する裁定者は誰ですか?',
+    schema: playerResultSchema,
+  });
+}
+
+export async function evaluateNextTurn(llm: LLMProvider, game: Game): Promise<PlayerResult> {
+  if (!game.frontmatter.current_turn || game.participants.length === 0) {
+    return { player_id: null, reason: '手番プレイヤーまたは参加者が存在しません' };
+  }
+  const systemPrompt = `あなたはノミック (Nomic) ゲームの手番進行を判定する役割です。
+現行ルールに従い、現在の手番が終わった後、次に手番を回す対象プレイヤーの Discord User ID を返してください。
+
+- player_id: 次の手番プレイヤーの Discord User ID (参加者リストに含まれること)。判定不能なら null
+- reason: どのルール (Rule 番号) に基づくか
+
+参加者 (リスト順 = ゲーム開始時のメンション順 = 着座順):
+${participantsText(game)}
+
+現行の全ルール:
+${rulesText(game)}
+
+現在の手番プレイヤー Discord User ID: ${game.frontmatter.current_turn}`;
+
+  return llm.generate({
+    systemPrompt,
+    userMessage: '現在の手番が終わった後、次に手番が回るのは誰ですか?',
+    schema: playerResultSchema,
+  });
+}
