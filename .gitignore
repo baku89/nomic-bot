@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.local
+*.log
+.cache/
+.DS_Store
+
+# Actual allowlist (use config/allowlist.example.json as template)
+config/allowlist.json
