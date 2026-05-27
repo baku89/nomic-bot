@@ -75,7 +75,6 @@ async function executeAction(
           game: ctx.existingGame,
           gamesDir: config.gamesDir,
           initiatedBy: message.author.id,
-          winnerMention: action.winner_mention,
           reason: action.reason,
         });
       } else if (message.channel.isSendable()) {

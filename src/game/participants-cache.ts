@@ -6,84 +6,64 @@ import {
   unlinkSync,
 } from 'node:fs';
 import { join } from 'node:path';
+import type { ActiveProposal, PendingEnd } from './frontmatter.js';
 
 const CACHE_DIR = join(process.cwd(), '.cache', 'games');
 
 export type CachedParticipant = { username: string; discordId: string };
 
-type GameCacheFile = {
+export type GameRuntimeCache = {
   participants: CachedParticipant[];
-  active_proposal_runtime?: { vote_message_id?: string };
-  pending_end_runtime?: { confirm_message_id?: string };
+  current_turn: string | null;
+  current_turn_username: string | null;
+  active_proposal: ActiveProposal | null;
+  pending_end: PendingEnd | null;
+};
+
+const EMPTY: GameRuntimeCache = {
+  participants: [],
+  current_turn: null,
+  current_turn_username: null,
+  active_proposal: null,
+  pending_end: null,
 };
 
 function cachePath(fileStem: string): string {
   return join(CACHE_DIR, `${fileStem}.json`);
 }
 
-function load(fileStem: string): GameCacheFile {
+function loadFile(fileStem: string): GameRuntimeCache {
   const p = cachePath(fileStem);
-  if (!existsSync(p)) return { participants: [] };
+  if (!existsSync(p)) return { ...EMPTY };
   try {
-    const data = JSON.parse(readFileSync(p, 'utf-8'));
+    const data = JSON.parse(readFileSync(p, 'utf-8')) as Partial<GameRuntimeCache>;
     return {
       participants: Array.isArray(data?.participants) ? data.participants : [],
-      active_proposal_runtime: data?.active_proposal_runtime,
-      pending_end_runtime: data?.pending_end_runtime,
+      current_turn: data?.current_turn ?? null,
+      current_turn_username: data?.current_turn_username ?? null,
+      active_proposal: data?.active_proposal ?? null,
+      pending_end: data?.pending_end ?? null,
     };
   } catch {
-    return { participants: [] };
+    return { ...EMPTY };
   }
 }
 
-function save(fileStem: string, data: GameCacheFile): void {
+function saveFile(fileStem: string, data: GameRuntimeCache): void {
   mkdirSync(CACHE_DIR, { recursive: true });
   writeFileSync(cachePath(fileStem), JSON.stringify(data, null, 2));
 }
 
+export function loadRuntimeCache(fileStem: string): GameRuntimeCache {
+  return loadFile(fileStem);
+}
+
+export function saveRuntimeCache(fileStem: string, data: GameRuntimeCache): void {
+  saveFile(fileStem, data);
+}
+
 export function getParticipantsCache(fileStem: string): CachedParticipant[] {
-  return load(fileStem).participants;
-}
-
-export function setParticipantsCache(
-  fileStem: string,
-  participants: CachedParticipant[],
-): void {
-  const cur = load(fileStem);
-  save(fileStem, { ...cur, participants });
-}
-
-export function getRuntimeIds(fileStem: string): {
-  vote_message_id?: string;
-  confirm_message_id?: string;
-} {
-  const c = load(fileStem);
-  return {
-    vote_message_id: c.active_proposal_runtime?.vote_message_id,
-    confirm_message_id: c.pending_end_runtime?.confirm_message_id,
-  };
-}
-
-export function setRuntimeIds(
-  fileStem: string,
-  ids: { vote_message_id?: string | null; confirm_message_id?: string | null },
-): void {
-  const cur = load(fileStem);
-  const ap = cur.active_proposal_runtime ?? {};
-  const pe = cur.pending_end_runtime ?? {};
-  if (ids.vote_message_id !== undefined) {
-    if (ids.vote_message_id === null) delete ap.vote_message_id;
-    else ap.vote_message_id = ids.vote_message_id;
-  }
-  if (ids.confirm_message_id !== undefined) {
-    if (ids.confirm_message_id === null) delete pe.confirm_message_id;
-    else pe.confirm_message_id = ids.confirm_message_id;
-  }
-  save(fileStem, {
-    participants: cur.participants,
-    active_proposal_runtime: Object.keys(ap).length ? ap : undefined,
-    pending_end_runtime: Object.keys(pe).length ? pe : undefined,
-  });
+  return loadFile(fileStem).participants;
 }
 
 export function clearGameCache(fileStem: string): void {

@@ -26,7 +26,6 @@ export const noopActionSchema = z.object({
 
 export const proposeGameEndActionSchema = z.object({
   type: z.literal('propose_game_end'),
-  winner_mention: z.string().nullable(),
   reason: z.string(),
 });
 

@@ -4,7 +4,6 @@ import type { Game } from '../game/state.js';
 
 export const winCheckSchema = z.object({
   game_should_end: z.boolean(),
-  winner_mention: z.string().nullable(),
   reason: z.string(),
 });
 
@@ -15,8 +14,7 @@ export async function checkForWinner(llm: LLMProvider, game: Game): Promise<WinC
 現在のルール条文と参加者リストを見て、ゲームが終了すべき状況にあるか判定してください。
 
 - game_should_end: 終了すべきなら true、まだ継続中なら false
-- winner_mention: 勝者が明確なら Discord メンション (例: "<@123456789>")。勝者なしや不明なら null
-- reason: 判定根拠 (どのルール条文に基づくか)
+- reason: 判定根拠 (どのルール条文に基づくか)。勝者がいるなら reason の中に「@Foo の勝利 (Rule X による)」のように含める。勝者なしや曖昧なら理由だけ書く
 
 注意:
 - 「特定プレイヤーが勝ち」「ゲーム終了条件 (得点 X 以上で勝利など) が満たされた」などの明らかな終了状況だけ true にする

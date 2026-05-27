@@ -207,31 +207,23 @@ async function handleEnd(
     return;
   }
 
-  const winner = interaction.options.getUser('winner', false);
-  const reason = interaction.options.getString('reason', false);
-  const winnerMention = winner ? `<@${winner.id}>` : undefined;
+  const reason = interaction.options.getString('reason', false) ?? '強制終了';
 
-  endGame(config.gamesDir, game, {
-    winnerMention,
-    reason: reason ?? undefined,
-  });
+  endGame(config.gamesDir, game, { reason });
 
   const repo = new GitGameRepo(config.gamesDir);
   await repo.ensureRepo();
   const enderName = `\`@${interaction.user.username}\``;
-  const commitMsg = winner
-    ? `[${game.name}] ゲーム終了 by ${enderName}: \`@${winner.username}\` の勝利${reason ? ` — ${reason}` : ''}`
-    : `[${game.name}] ゲーム強制終了 by ${enderName}${reason ? `: ${reason}` : ''}`;
+  const commitMsg = `[${game.name}] ゲーム強制終了 by ${enderName}: ${reason}`;
   await repo.commit(commitMsg);
 
   const repoUrl = await getGamesRepoUrl(config.gamesDir);
   const url = repoUrl ? gameFileUrl(repoUrl, game.fileStem, true) : null;
   const lines = [
     `**ゲーム「${game.name}」が終了しました。** (強制終了 by <@${interaction.user.id}>)`,
-    winner ? `🏆 勝者: <@${winner.id}>` : '勝者: なし',
+    `理由: ${reason}`,
+    `最終ルール数: ${game.rules.length} 条`,
   ];
-  if (reason) lines.push(`理由: ${reason}`);
-  lines.push(`最終ルール数: ${game.rules.length} 条`);
   if (url) lines.push(`📄 アーカイブ: <${url}>`);
 
   await interaction.reply(lines.join('\n'));

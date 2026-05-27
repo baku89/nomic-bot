@@ -23,11 +23,8 @@ const commands = [
   new SlashCommandBuilder()
     .setName('end')
     .setDescription('ゲームを強制終了する')
-    .addUserOption((o) =>
-      o.setName('winner').setDescription('勝者 (任意)').setRequired(false),
-    )
     .addStringOption((o) =>
-      o.setName('reason').setDescription('終了理由 (任意)').setRequired(false),
+      o.setName('reason').setDescription('終了理由 (任意、勝者がいればここに含める)').setRequired(false),
     ),
 ].map((c) => c.toJSON());
 

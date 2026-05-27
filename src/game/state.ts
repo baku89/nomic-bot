@@ -15,14 +15,12 @@ import {
 import { getInitialRules } from '../initial-rules.js';
 import { getGameByChannel, clearGameFromCache } from './channel-cache.js';
 import {
-  getParticipantsCache,
-  setParticipantsCache,
-  getRuntimeIds,
-  setRuntimeIds,
+  loadRuntimeCache,
+  saveRuntimeCache,
   clearGameCache,
   resolveDiscordId,
-  resolveUsername,
   type CachedParticipant,
+  type GameRuntimeCache,
 } from './participants-cache.js';
 
 export type Participant = {
@@ -72,40 +70,51 @@ export function listActiveStems(gamesDir: string): string[] {
 export function readGame(gamesDir: string, fileStem: string): Game {
   const path = gamePath(gamesDir, fileStem);
   const content = readFileSync(path, 'utf-8');
-  const { frontmatter, body } = parseGameFile(content);
+  const { frontmatter: ondisk, body } = parseGameFile(content);
   const bodyParts = parseBody(body);
 
-  // Merge cached participants (which have discordId) with body's usernames
-  const cached = getParticipantsCache(fileStem);
-  const participants = enrichParticipants(bodyParts.participants, cached);
+  const cache = loadRuntimeCache(fileStem);
+  const participants = enrichParticipants(bodyParts.participants, cache.participants);
 
-  // Resolve IDs in frontmatter from usernames if needed
-  const enrichedFrontmatter = resolveFrontmatterIds(frontmatter, participants, fileStem);
+  // Prefer cache for runtime state; fall back to legacy on-disk values
+  const frontmatter: GameFrontmatter = {
+    status: ondisk.status,
+    started_at: ondisk.started_at,
+    current_turn: cache.current_turn ?? ondisk.current_turn ?? null,
+    current_turn_username:
+      cache.current_turn_username ?? ondisk.current_turn_username ?? null,
+    active_proposal: cache.active_proposal ?? ondisk.active_proposal ?? null,
+    pending_end: cache.pending_end ?? ondisk.pending_end ?? null,
+  };
 
   return {
     name: extractShortName(fileStem),
     fileStem,
-    frontmatter: enrichedFrontmatter,
+    frontmatter,
     participants,
     rules: bodyParts.rules,
   };
 }
 
 export function writeGame(gamesDir: string, game: Game): void {
-  // Persist participants cache (full username + discordId)
-  setParticipantsCache(
-    game.fileStem,
-    game.participants.map((p) => ({ username: p.username, discordId: p.discordId })),
-  );
+  // Persist all runtime state to local cache (not to disk)
+  const cache: GameRuntimeCache = {
+    participants: game.participants.map((p) => ({
+      username: p.username,
+      discordId: p.discordId,
+    })),
+    current_turn: game.frontmatter.current_turn,
+    current_turn_username: game.frontmatter.current_turn_username,
+    active_proposal: game.frontmatter.active_proposal,
+    pending_end: game.frontmatter.pending_end,
+  };
+  saveRuntimeCache(game.fileStem, cache);
 
-  // Persist message IDs to cache (not to disk frontmatter)
-  setRuntimeIds(game.fileStem, {
-    vote_message_id: game.frontmatter.active_proposal?.vote_message_id ?? null,
-    confirm_message_id: game.frontmatter.pending_end?.confirm_message_id ?? null,
-  });
-
-  // Build a public-only frontmatter (no Discord IDs, no message IDs)
-  const publicFrontmatter = scrubFrontmatterForDisk(game);
+  // Disk frontmatter only contains the persistent game record metadata
+  const publicFrontmatter = {
+    status: game.frontmatter.status,
+    started_at: game.frontmatter.started_at,
+  };
 
   const body = renderBody(game);
   const content = serializeGameFile(publicFrontmatter, body);
@@ -123,96 +132,6 @@ function enrichParticipants(
     const id = resolveDiscordId(cached, p.username);
     return { username: p.username, discordId: id };
   });
-}
-
-function resolveFrontmatterIds(
-  fm: GameFrontmatter,
-  participants: Participant[],
-  fileStem: string,
-): GameFrontmatter {
-  const usernameToId = new Map(participants.map((p) => [p.username, p.discordId]));
-  const runtimeIds = getRuntimeIds(fileStem);
-  const next: GameFrontmatter = { ...fm };
-
-  // current_turn: prefer current_turn_username, else legacy current_turn
-  if (next.current_turn_username) {
-    next.current_turn = usernameToId.get(next.current_turn_username) ?? next.current_turn ?? null;
-  }
-
-  if (next.active_proposal) {
-    const ap = { ...next.active_proposal };
-    if (!ap.proposer_id && ap.proposer_username) {
-      ap.proposer_id = usernameToId.get(ap.proposer_username) ?? '';
-    }
-    if (!ap.vote_message_id && runtimeIds.vote_message_id) {
-      ap.vote_message_id = runtimeIds.vote_message_id;
-    }
-    next.active_proposal = ap;
-  }
-
-  if (next.pending_end) {
-    const pe = { ...next.pending_end };
-    if (!pe.initiated_by && pe.initiated_by_username) {
-      pe.initiated_by = usernameToId.get(pe.initiated_by_username) ?? '';
-    }
-    if (!pe.winner_id && pe.winner_username) {
-      pe.winner_id = usernameToId.get(pe.winner_username) ?? null;
-    }
-    if (!pe.confirm_message_id && runtimeIds.confirm_message_id) {
-      pe.confirm_message_id = runtimeIds.confirm_message_id;
-    }
-    next.pending_end = pe;
-  }
-
-  return next;
-}
-
-function scrubFrontmatterForDisk(game: Game): Record<string, unknown> {
-  const fm = game.frontmatter;
-  const usernameOf = (id: string | null) =>
-    id ? resolveUsername(
-      game.participants.map((p) => ({ username: p.username, discordId: p.discordId })),
-      id,
-    ) || null : null;
-
-  const out: Record<string, unknown> = {
-    status: fm.status,
-    started_at: fm.started_at,
-    current_turn_username: usernameOf(fm.current_turn),
-    active_proposal: null,
-    pending_end: null,
-  };
-
-  if (fm.active_proposal) {
-    const ap = fm.active_proposal;
-    out.active_proposal = {
-      id: ap.id,
-      proposer_username: ap.proposer_username || usernameOf(ap.proposer_id) || '',
-      op: ap.op,
-      target_rule_number: ap.target_rule_number,
-      new_rule_text: ap.new_rule_text,
-      interpretation: ap.interpretation,
-      raw_text: ap.raw_text,
-      proposed_at: ap.proposed_at,
-      vote_deadline: ap.vote_deadline,
-      // vote_message_id intentionally excluded (stored in cache)
-    };
-  }
-
-  if (fm.pending_end) {
-    const pe = fm.pending_end;
-    out.pending_end = {
-      initiated_by_username:
-        pe.initiated_by_username || usernameOf(pe.initiated_by) || '',
-      winner_username: pe.winner_username || usernameOf(pe.winner_id) || '',
-      winner_mention: pe.winner_mention,
-      reason: pe.reason,
-      initiated_at: pe.initiated_at,
-      // confirm_message_id intentionally excluded (stored in cache)
-    };
-  }
-
-  return out;
 }
 
 export function findGameByChannel(gamesDir: string, channelId: string): Game | null {
@@ -331,7 +250,7 @@ export function participantById(game: Game, discordId: string): Participant | nu
 export function endGame(
   gamesDir: string,
   game: Game,
-  opts: { winnerMention?: string; reason?: string },
+  opts: { reason: string },
 ): { archivePath: string } {
   const endedAt = new Date().toISOString();
   game.frontmatter.status = 'completed';
@@ -341,11 +260,9 @@ export function endGame(
 
   const baseBody = renderBody(game);
   const endingSection = [
-    '## 勝者',
+    '## 終了',
     '',
-    opts.winnerMention
-      ? `- ${opts.winnerMention} の勝利${opts.reason ? ` — ${opts.reason}` : ''}`
-      : `- 勝者なし (強制終了)${opts.reason ? ` — ${opts.reason}` : ''}`,
+    `- 理由: ${opts.reason}`,
     `- 終了日時: ${endedAt}`,
     `- 最終ルール数: ${game.rules.length} 条`,
     '',

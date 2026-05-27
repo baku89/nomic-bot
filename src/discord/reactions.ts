@@ -189,7 +189,6 @@ async function tallyAndMaybeFinalize(
           game: updatedGame,
           gamesDir: config.gamesDir,
           initiatedBy: message.client.user!.id,
-          winnerMention: winCheck.winner_mention,
           reason: winCheck.reason,
         });
         return;
@@ -241,21 +240,11 @@ async function tallyEndConfirmation(message: Message, game: Game, config: Config
   const pending = refreshed.frontmatter.pending_end;
   if (!pending) return;
 
-  endGame(config.gamesDir, refreshed, {
-    winnerMention: pending.winner_mention ?? undefined,
-    reason: pending.reason,
-  });
+  endGame(config.gamesDir, refreshed, { reason: pending.reason });
 
   const repo = new GitGameRepo(config.gamesDir);
   await repo.ensureRepo();
-  const winnerName = pending.winner_username
-    ? `\`@${pending.winner_username}\``
-    : pending.winner_id
-      ? `\`@${pending.winner_id}\``
-      : '';
-  const commitMsg = winnerName
-    ? `[${refreshed.name}] ゲーム終了 (参加者合意): ${winnerName} の勝利 — ${pending.reason}`
-    : `[${refreshed.name}] ゲーム終了 (参加者合意): ${pending.reason}`;
+  const commitMsg = `[${refreshed.name}] ゲーム終了 (参加者合意): ${pending.reason}`;
   await repo.commit(commitMsg);
 
   if (message.channel.isSendable()) {
@@ -263,7 +252,6 @@ async function tallyEndConfirmation(message: Message, game: Game, config: Config
     const url = repoUrl ? gameFileUrl(repoUrl, refreshed.fileStem, true) : null;
     const lines = [
       `🏁 **ゲーム「${refreshed.name}」が終了しました。** (参加者全員合意)`,
-      pending.winner_mention ? `🏆 勝者: ${pending.winner_mention}` : '勝者: なし',
       `理由: ${pending.reason}`,
       `最終ルール数: ${refreshed.rules.length} 条`,
     ];

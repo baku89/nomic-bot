@@ -20,9 +20,6 @@ export type ActiveProposal = z.infer<typeof activeProposalSchema>;
 export const pendingEndSchema = z.object({
   initiated_by: z.string().default(''),
   initiated_by_username: z.string().default(''),
-  winner_id: z.string().nullable().default(null),
-  winner_mention: z.string().nullable().default(null),
-  winner_username: z.string().default(''),
   reason: z.string(),
   confirm_message_id: z.string().default(''),
   initiated_at: z.string(),
@@ -35,8 +32,8 @@ export const gameFrontmatterSchema = z.object({
   started_at: z.string(),
   current_turn: z.string().nullable().default(null),
   current_turn_username: z.string().nullable().default(null),
-  active_proposal: activeProposalSchema.nullable(),
-  pending_end: pendingEndSchema.nullable().optional(),
+  active_proposal: activeProposalSchema.nullable().default(null),
+  pending_end: pendingEndSchema.nullable().default(null),
 });
 
 export type GameFrontmatter = z.infer<typeof gameFrontmatterSchema>;
