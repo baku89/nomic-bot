@@ -219,7 +219,7 @@ async function tallyEndConfirmation(message: Message, game: Game, config: Config
 
   if (message.channel.isSendable()) {
     const repoUrl = await getGamesRepoUrl(config.gamesDir);
-    const url = repoUrl ? gameFileUrl(repoUrl, refreshed.name, true) : null;
+    const url = repoUrl ? gameFileUrl(repoUrl, refreshed.fileStem, true) : null;
     const lines = [
       `🏁 **ゲーム「${refreshed.name}」が終了しました。** (参加者全員合意)`,
       pending.winner_mention ? `🏆 勝者: ${pending.winner_mention}` : '勝者: なし',
