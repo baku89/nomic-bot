@@ -38,8 +38,11 @@ export async function postEndConfirmation(opts: {
   await sent.react(VOTE_YES);
   await sent.react(VOTE_NO);
 
+  const initiatorUsername =
+    opts.game.participants.find((p) => p.discordId === opts.initiatedBy)?.username ?? '';
   opts.game.frontmatter.pending_end = {
     initiated_by: opts.initiatedBy,
+    initiated_by_username: initiatorUsername,
     winner_id: winnerId,
     winner_mention: opts.winnerMention,
     winner_username: winnerUsername,
