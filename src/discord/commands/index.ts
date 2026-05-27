@@ -106,6 +106,32 @@ async function handlePropose(
   const llm = createLLMProvider(config);
   const interp = await interpretProposal(llm, text, game.rules);
 
+  const errors: string[] = [];
+  if ((interp.op === 'modify' || interp.op === 'repeal') && interp.target_rule_number == null) {
+    errors.push('修正/廃止の対象ルール番号を特定できませんでした (LLMの解釈が「全て」「100番台」など複数や曖昧な対象を含んだ可能性があります)。');
+  }
+  if ((interp.op === 'enact' || interp.op === 'modify') && !interp.new_rule_text) {
+    errors.push('制定/修正の新しいルール本文を読み取れませんでした。');
+  }
+  if (interp.op !== 'enact' && interp.target_rule_number !== null) {
+    const prefix = `${interp.target_rule_number}.`;
+    const exists = game.rules.some((r) => r.trimStart().startsWith(prefix));
+    if (!exists) {
+      errors.push(`Rule ${interp.target_rule_number} は現行ルールに存在しません。`);
+    }
+  }
+  if (errors.length) {
+    await interaction.editReply({
+      content: [
+        '提案を解釈できませんでした:',
+        ...errors.map((e) => `- ${e}`),
+        '',
+        '対象ルール番号と新しい本文を明示して `/propose` を再実行してください。',
+      ].join('\n'),
+    });
+    return;
+  }
+
   const voteDeadline = hoursFromNow(24);
   const deadlineStr = formatDeadlineJST(voteDeadline);
 
@@ -157,6 +183,13 @@ async function handleEnd(
   if (!game) {
     await interaction.reply({
       content: 'このチャンネルにはアクティブなゲームがありません。',
+      ephemeral: true,
+    });
+    return;
+  }
+  if (!game.participants.some((p) => p.discordId === interaction.user.id)) {
+    await interaction.reply({
+      content: '`/end` はこのゲームの参加者のみ実行できます。',
       ephemeral: true,
     });
     return;
