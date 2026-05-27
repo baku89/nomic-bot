@@ -3,6 +3,8 @@ import type { LLMProvider } from './provider.js';
 import type { Game } from '../game/state.js';
 import type { ActiveProposal } from '../game/frontmatter.js';
 
+const JAPANESE_ONLY = `\n\n**重要**: 出力する文字列フィールド (reason 等) は必ず日本語で記述すること。英語で書いてはいけない。ルール番号や Discord ID などの記号類はそのままで構わないが、説明文は日本語のみ。`;
+
 const tallyResultSchema = z.object({
   state: z.enum(['pending', 'passed', 'rejected']),
   reason: z.string(),
@@ -71,7 +73,7 @@ ${votesText}
 - 迷う場合は 'pending' (誤判定で勝手に採択/否決するより、待つ方がコストが低い)`;
 
   return llm.generate({
-    systemPrompt,
+    systemPrompt: systemPrompt + JAPANESE_ONLY,
     userMessage: '現在の状況での採決判定を返してください。',
     schema: tallyResultSchema,
   });
@@ -96,7 +98,7 @@ ${rulesText(game)}
 現在の手番プレイヤー Discord User ID: ${game.frontmatter.current_turn}`;
 
   return llm.generate({
-    systemPrompt,
+    systemPrompt: systemPrompt + JAPANESE_ONLY,
     userMessage: '現在の手番プレイヤーに対する裁定者は誰ですか?',
     schema: playerResultSchema,
   });
@@ -121,7 +123,7 @@ ${rulesText(game)}
 現在の手番プレイヤー Discord User ID: ${game.frontmatter.current_turn}`;
 
   return llm.generate({
-    systemPrompt,
+    systemPrompt: systemPrompt + JAPANESE_ONLY,
     userMessage: '現在の手番が終わった後、次に手番が回るのは誰ですか?',
     schema: playerResultSchema,
   });

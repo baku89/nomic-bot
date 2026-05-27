@@ -31,7 +31,9 @@ export async function checkForContradictions(llm: LLMProvider, game: Game): Prom
 - **迷う場合は false にする** (誤検知で勝手に異議を立てるより、見逃すほうがコストが低い)
 
 現在のルール (全 ${game.rules.length} 条):
-${game.rules.map((r) => `- ${r}`).join('\n')}`;
+${game.rules.map((r) => `- ${r}`).join('\n')}
+
+**重要**: 出力する文字列フィールド (description, notes 等) は必ず日本語で記述すること。英語で書いてはいけない。`;
 
   return llm.generate({
     systemPrompt,

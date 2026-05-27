@@ -27,7 +27,9 @@ export async function interpretProposal(
 ${currentRules.map((r) => `- ${r}`).join('\n')}
 
 提案テキストが既存ルールに言及している場合、上記リストの番号を target_rule_number に入れてください。
-新本文を書く際は、既存のルール番号を含めず、本文のみを書いてください。`;
+新本文を書く際は、既存のルール番号を含めず、本文のみを書いてください。
+
+**重要**: 出力する文字列フィールド (interpretation, new_rule_text 等) は必ず日本語で記述すること。英語で書いてはいけない。`;
 
   return llm.generate({
     systemPrompt,

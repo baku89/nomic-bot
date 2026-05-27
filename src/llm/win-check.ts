@@ -26,7 +26,9 @@ export async function checkForWinner(llm: LLMProvider, game: Game): Promise<WinC
 参加者: ${game.participants.map((p) => `@${p.username} (id: ${p.discordId})`).join(', ')}
 
 現在のルール (全 ${game.rules.length} 条):
-${game.rules.map((r) => `- ${r}`).join('\n')}`;
+${game.rules.map((r) => `- ${r}`).join('\n')}
+
+**重要**: 出力する文字列フィールド (reason 等) は必ず日本語で記述すること。英語で書いてはいけない。`;
 
   return llm.generate({
     systemPrompt,
