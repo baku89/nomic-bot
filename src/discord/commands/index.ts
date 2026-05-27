@@ -1,4 +1,9 @@
-import type { ChatInputCommandInteraction, Message, SendableChannels } from 'discord.js';
+import {
+  MessageFlags,
+  type ChatInputCommandInteraction,
+  type Message,
+  type SendableChannels,
+} from 'discord.js';
 import type { Config } from '../../config.js';
 import { findGameByChannel, endGame, writeGame, mentionOf } from '../../game/state.js';
 import { GitGameRepo } from '../../git/commit.js';
@@ -262,13 +267,13 @@ async function handleStatus(
 
   const MAX = 1900;
   if (full.length <= MAX) {
-    await interaction.reply({ content: full });
+    await interaction.reply({ content: full, flags: MessageFlags.Ephemeral });
     return;
   }
   const chunks = splitByLines(full, MAX);
-  await interaction.reply({ content: chunks[0] });
+  await interaction.reply({ content: chunks[0], flags: MessageFlags.Ephemeral });
   for (let i = 1; i < chunks.length; i++) {
-    await interaction.followUp({ content: chunks[i] });
+    await interaction.followUp({ content: chunks[i], flags: MessageFlags.Ephemeral });
   }
 }
 
