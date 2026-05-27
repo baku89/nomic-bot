@@ -10,7 +10,7 @@ import {
   writeGame,
   type Game,
 } from '../game/state.js';
-import { evaluateJudge } from '../llm/rule-engine.js';
+import { evaluateJudge, evaluateEligibleVoters } from '../llm/rule-engine.js';
 import { postEndConfirmation } from './end-confirmation.js';
 import { startGameAndAnnounce } from './game-start.js';
 import { buildProposalMessageContent } from './proposal-message.js';
@@ -183,6 +183,23 @@ async function handleAmendProposal(
   }
 
   const deadlineStr = formatDeadlineJST(new Date(proposal.vote_deadline));
+  const llm = createLLMProvider(config);
+  let eligibleIds: string[] | null = null;
+  try {
+    const res = await evaluateEligibleVoters(llm, existingGame, proposal.proposer_id);
+    const valid = new Set(existingGame.participants.map((p) => p.discordId));
+    eligibleIds = res.eligible_player_ids.filter((id) => valid.has(id));
+    if (eligibleIds.length === 0) eligibleIds = null;
+  } catch {
+    /* fallback below */
+  }
+  const voterMentions = (eligibleIds
+    ? existingGame.participants.filter((p) => eligibleIds!.includes(p.discordId))
+    : existingGame.participants.length === 1
+      ? existingGame.participants
+      : existingGame.participants.filter((p) => p.discordId !== proposal.proposer_id)
+  ).map((p) => `<@${p.discordId}>`);
+
   const newContent = buildProposalMessageContent({
     proposerId: proposal.proposer_id,
     rawText: proposal.raw_text,
@@ -191,7 +208,7 @@ async function handleAmendProposal(
     targetRuleNumber: proposal.target_rule_number,
     newRuleText: proposal.new_rule_text,
     deadlineStr,
-    voterMentions: existingGame.participants.map((p) => `<@${p.discordId}>`),
+    voterMentions,
     amendedFromOriginal: true,
     amendReason: action.reason,
   });

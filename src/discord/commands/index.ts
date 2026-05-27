@@ -5,6 +5,7 @@ import { GitGameRepo } from '../../git/commit.js';
 import { getGamesRepoUrl, gameFileUrl } from '../../game/repo-url.js';
 import { createLLMProvider } from '../../llm/index.js';
 import { interpretProposal } from '../../llm/propose-interpreter.js';
+import { evaluateEligibleVoters } from '../../llm/rule-engine.js';
 import { formatDeadlineJST, hoursFromNow } from '../../utils/time.js';
 import { VOTE_YES, VOTE_NO, VOTE_ABSTAIN } from '../reactions.js';
 import { startGameAndAnnounce } from '../game-start.js';
@@ -136,6 +137,22 @@ async function handlePropose(
   const voteDeadline = hoursFromNow(24);
   const deadlineStr = formatDeadlineJST(voteDeadline);
 
+  let eligibleIds: string[] | null = null;
+  try {
+    const res = await evaluateEligibleVoters(llm, game, interaction.user.id);
+    const valid = new Set(game.participants.map((p) => p.discordId));
+    eligibleIds = res.eligible_player_ids.filter((id) => valid.has(id));
+    if (eligibleIds.length === 0) eligibleIds = null;
+  } catch (err) {
+    console.error('[rule-engine] evaluateEligibleVoters failed, fallback:', err);
+  }
+  const voterMentions = (eligibleIds
+    ? game.participants.filter((p) => eligibleIds!.includes(p.discordId))
+    : game.participants.length === 1
+      ? game.participants
+      : game.participants.filter((p) => p.discordId !== interaction.user.id)
+  ).map((p) => mentionOf(p));
+
   const proposalContent = buildProposalMessageContent({
     proposerId: interaction.user.id,
     rawText: text,
@@ -144,7 +161,7 @@ async function handlePropose(
     targetRuleNumber: interp.target_rule_number,
     newRuleText: interp.new_rule_text,
     deadlineStr,
-    voterMentions: game.participants.map((p) => mentionOf(p)),
+    voterMentions,
   });
 
   const reply = await interaction.editReply({ content: proposalContent });

@@ -22,6 +22,12 @@ const playerResultSchema = z.object({
 });
 export type PlayerResult = z.infer<typeof playerResultSchema>;
 
+const eligibleVotersSchema = z.object({
+  eligible_player_ids: z.array(z.string()),
+  reason: z.string(),
+});
+export type EligibleVotersResult = z.infer<typeof eligibleVotersSchema>;
+
 function rulesText(game: Game): string {
   return game.rules.map((r) => `- ${r}`).join('\n');
 }
@@ -106,6 +112,40 @@ ${rulesText(game)}
     systemPrompt: systemPrompt + JAPANESE_ONLY,
     userMessage: '現在の手番プレイヤーに対する裁定者は誰ですか?',
     schema: playerResultSchema,
+  });
+}
+
+export async function evaluateEligibleVoters(
+  llm: LLMProvider,
+  game: Game,
+  proposerDiscordId: string,
+): Promise<EligibleVotersResult> {
+  if (game.participants.length === 0) {
+    return { eligible_player_ids: [], reason: '参加者なし' };
+  }
+  const systemPrompt = `あなたはノミック (Nomic) ゲームの投票資格を判定する役割です。
+現行ルールに従い、与えられた提案に対して投票できる参加者の Discord User ID の配列を返してください。
+
+- eligible_player_ids: 投票資格を持つ参加者の Discord User ID 配列
+- reason: 判定の根拠 (どのルールに基づいたか)
+
+参加者:
+${participantsText(game)}
+
+現行の全ルール:
+${rulesText(game)}
+
+提案者 Discord User ID: ${proposerDiscordId}
+
+判定の指針:
+- Rule 107 「各プレイヤーは常に一票を有する」が基本だが、提案者除外条項などの例外が含まれる場合があるので注意
+- ルールに「参加者が一名のみの場合」など特殊条項があれば適用
+- eligible_player_ids には参加者リストに含まれる ID のみ含めること`;
+
+  return llm.generate({
+    systemPrompt: systemPrompt + JAPANESE_ONLY,
+    userMessage: 'この提案に投票資格があるのは誰ですか?',
+    schema: eligibleVotersSchema,
   });
 }
 
