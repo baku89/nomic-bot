@@ -176,8 +176,13 @@ async function tallyEndConfirmation(message: Message, game: Game, config: Config
 
   const repo = new GitGameRepo(config.gamesDir);
   await repo.ensureRepo();
-  const commitMsg = pending.winner_mention
-    ? `[${refreshed.name}] ゲーム終了 (参加者合意): ${pending.winner_mention} の勝利 — ${pending.reason}`
+  const winnerName = pending.winner_username
+    ? `\`@${pending.winner_username}\``
+    : pending.winner_id
+      ? `\`@${pending.winner_id}\``
+      : '';
+  const commitMsg = winnerName
+    ? `[${refreshed.name}] ゲーム終了 (参加者合意): ${winnerName} の勝利 — ${pending.reason}`
     : `[${refreshed.name}] ゲーム終了 (参加者合意): ${pending.reason}`;
   await repo.commit(commitMsg);
 
@@ -190,7 +195,7 @@ async function tallyEndConfirmation(message: Message, game: Game, config: Config
       `理由: ${pending.reason}`,
       `最終ルール数: ${refreshed.rules.length} 条`,
     ];
-    if (url) lines.push(`📄 アーカイブ: ${url}`);
+    if (url) lines.push(`📄 アーカイブ: <${url}>`);
     await message.channel.send(lines.join('\n'));
   }
 }
@@ -221,7 +226,7 @@ async function fetchReactors(message: Message, emoji: string): Promise<Set<strin
 }
 
 function formatCommitMessage(
-  proposal: { interpretation: string; raw_text: string; op: string; target_rule_number: number | null; proposer_id: string },
+  proposal: { interpretation: string; raw_text: string; op: string; target_rule_number: number | null; proposer_id: string; proposer_username: string },
   votes: Record<string, Vote>,
   approved: boolean,
 ): string {
@@ -231,8 +236,9 @@ function formatCommitMessage(
   const verb = approved ? '採択' : '否決';
   const opLabel = proposal.op === 'enact' ? '制定' : proposal.op === 'modify' ? '修正' : '廃止';
   const targetPart = proposal.target_rule_number !== null ? ` Rule ${proposal.target_rule_number}` : '';
+  const proposer = `\`@${proposal.proposer_username || proposal.proposer_id}\``;
   return [
-    `提案 ${verb} by <@${proposal.proposer_id}>: ${proposal.interpretation}`,
+    `提案 ${verb} by ${proposer}: ${proposal.interpretation}`,
     '',
     `操作: ${opLabel}${targetPart}`,
     `投票: yes ${yes} / no ${no} / 棄権 ${abs}`,

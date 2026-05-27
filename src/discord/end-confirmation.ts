@@ -18,6 +18,9 @@ export async function postEndConfirmation(opts: {
   const winnerId = opts.winnerMention
     ? /<@!?(\d+)>/.exec(opts.winnerMention)?.[1] ?? null
     : null;
+  const winnerUsername = winnerId
+    ? opts.game.participants.find((p) => p.discordId === winnerId)?.username ?? ''
+    : '';
 
   const lines = [
     '🏁 **ゲーム終了の確認**',
@@ -39,6 +42,7 @@ export async function postEndConfirmation(opts: {
     initiated_by: opts.initiatedBy,
     winner_id: winnerId,
     winner_mention: opts.winnerMention,
+    winner_username: winnerUsername,
     reason: opts.reason,
     confirm_message_id: sent.id,
     initiated_at: new Date().toISOString(),

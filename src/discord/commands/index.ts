@@ -136,6 +136,7 @@ async function handlePropose(
   game.frontmatter.active_proposal = {
     id: `P-${Date.now()}`,
     proposer_id: interaction.user.id,
+    proposer_username: interaction.user.username,
     op: interp.op,
     target_rule_number: interp.target_rule_number,
     new_rule_text: interp.new_rule_text,
@@ -172,9 +173,10 @@ async function handleEnd(
 
   const repo = new GitGameRepo(config.gamesDir);
   await repo.ensureRepo();
+  const enderName = `\`@${interaction.user.username}\``;
   const commitMsg = winner
-    ? `[${game.name}] ゲーム終了: <@${winner.id}> の勝利${reason ? ` — ${reason}` : ''}`
-    : `[${game.name}] ゲーム強制終了${reason ? `: ${reason}` : ''}`;
+    ? `[${game.name}] ゲーム終了 by ${enderName}: \`@${winner.username}\` の勝利${reason ? ` — ${reason}` : ''}`
+    : `[${game.name}] ゲーム強制終了 by ${enderName}${reason ? `: ${reason}` : ''}`;
   await repo.commit(commitMsg);
 
   const repoUrl = await getGamesRepoUrl(config.gamesDir);
@@ -185,7 +187,7 @@ async function handleEnd(
   ];
   if (reason) lines.push(`理由: ${reason}`);
   lines.push(`最終ルール数: ${game.rules.length} 条`);
-  if (url) lines.push(`📄 アーカイブ: ${url}`);
+  if (url) lines.push(`📄 アーカイブ: <${url}>`);
 
   await interaction.reply(lines.join('\n'));
 }
@@ -210,7 +212,7 @@ async function handleStatus(
 
   const header = [
     `**ゲーム: ${game.name}**`,
-    ...(url ? [`📄 ${url}`] : []),
+    ...(url ? [`📄 <${url}>`] : []),
     `ステータス: ${game.frontmatter.status}`,
     `参加者: ${game.participants.map((p) => mentionOf(p)).join(' ')}`,
     `現在の手番: ${game.frontmatter.current_turn ? `<@${game.frontmatter.current_turn}>` : 'なし'}`,

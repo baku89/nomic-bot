@@ -51,6 +51,8 @@ export async function startGameAndAnnounce(opts: {
     };
   }
 
+  console.log(`[start] creating game "${opts.name}" with ${participants.length} participant(s)`);
+
   const game = createNewGame({
     name: opts.name,
     channelId: opts.channel.id,
@@ -58,14 +60,23 @@ export async function startGameAndAnnounce(opts: {
     participants,
   });
   writeGame(opts.config.gamesDir, game);
+  console.log(`[start] wrote ${opts.name}.md`);
+
+  let starterUsername = '';
+  try {
+    starterUsername = (await opts.channel.client.users.fetch(opts.starterUserId)).username;
+  } catch {
+    starterUsername = opts.starterUserId;
+  }
 
   const repo = new GitGameRepo(opts.config.gamesDir);
   await repo.ensureRepo();
   await repo.commit(
-    `新規ゲーム ${game.name} 開始 by <@${opts.starterUserId}> (参加者: ${participants
-      .map((p) => `@${p.username}`)
+    `新規ゲーム ${game.name} 開始 by \`@${starterUsername}\` (参加者: ${participants
+      .map((p) => `\`@${p.username || p.discordId}\``)
       .join(', ')})`,
   );
+  console.log(`[start] committed`);
 
   const repoUrl = await getGamesRepoUrl(opts.config.gamesDir);
   const gameUrl = repoUrl ? gameFileUrl(repoUrl, game.name, false) : null;
@@ -78,7 +89,14 @@ export async function startGameAndAnnounce(opts: {
     rules: game.rules,
     gameUrl,
   });
-  await sendLongMessage(opts.channel, announcement);
+  console.log(`[start] announcement built (${announcement.length} chars), sending...`);
+  try {
+    await sendLongMessage(opts.channel, announcement);
+    console.log(`[start] announcement sent`);
+  } catch (err) {
+    console.error(`[start] announcement send failed:`, err);
+    throw err;
+  }
 
   return { ok: true, game };
 }
@@ -116,7 +134,8 @@ function buildOpeningAnnouncement(opts: {
 }): string {
   return [
     `**ゲーム「${opts.gameName}」を開始しました。** (ミニマムノミック / 全 9 条)`,
-    ...(opts.gameUrl ? [`📄 進行状況: ${opts.gameUrl}`] : []),
+    ...(opts.gameUrl ? [`📄 進行状況: <${opts.gameUrl}>`] : []),
+    'ℹ️ ノミックについて: <https://ja.wikipedia.org/wiki/%E3%83%8E%E3%83%9F%E3%83%83%E3%82%AF>',
     '',
     'ノミックは「ルールを変えていくゲーム」です。プレイヤーは順番にルール改変を提案し、**全員一致**で採択されます。採択されたルールは即座に発効するため、ゲームのあり方そのものが変わっていきます。勝利条件すら最初は定められていません — それも今後の議論で決まります。',
     '',
