@@ -8,7 +8,10 @@ import {
 import { join } from 'node:path';
 import type { ActiveProposal, PendingEnd } from './frontmatter.js';
 
-const CACHE_DIR = join(process.cwd(), '.cache', 'games');
+const CACHE_BASE = process.env.CACHE_DIR
+  ? process.env.CACHE_DIR
+  : join(process.cwd(), '.cache');
+const CACHE_DIR = join(CACHE_BASE, 'games');
 
 export type CachedParticipant = { username: string; discordId: string };
 

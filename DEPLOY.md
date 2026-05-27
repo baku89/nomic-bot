@@ -90,6 +90,10 @@ $EDITOR .env
 # 必須: DISCORD_BOT_TOKEN, DISCORD_CLIENT_ID, GEMINI_API_KEY
 # 必須: GAMES_DIR=/var/lib/nomic-games
 # 推奨: MAINTAINER_DISCORD_ID=<自分の Discord User ID>
+# 推奨: CACHE_DIR=/var/lib/nomic-bot-cache  ← bot 配下の .cache から切り離すと
+#                                              再デプロイ時に絶対に消えない
+sudo mkdir -p /var/lib/nomic-bot-cache
+sudo chown $USER:$USER /var/lib/nomic-bot-cache
 
 # (6) ゲーム保管用リポを GitHub から SSH で clone (deploy key が効く)
 sudo mkdir -p /var/lib/nomic-games
@@ -152,6 +156,18 @@ git push origin main
 初回起動は (8) で済ませる前提なので、以後の `git push` は無停止リロード。
 
 進捗は GitHub の **Actions** タブで見える。手動実行したいときは Actions タブ → "Deploy" → "Run workflow"。
+
+## 永続化の前提
+
+進行中ゲームの runtime 状態 (誰の手番か、進行中の提案、投票の reaction メッセージ ID など) は **`CACHE_DIR` 配下**に JSON で持っています。再デプロイ時の `git reset --hard` は **追跡ファイルだけ**を上書きするので、`.cache/` (gitignore 済み) は**生き残ります**。
+
+ただし以下を避ければ常に安全:
+
+- `rm -rf .cache/` を打たない
+- bot ディレクトリを clone し直す前に `.cache/` をバックアップする (or `CACHE_DIR` を `/var/lib/nomic-bot-cache` のような外部パスにしておく)
+- VPS_PATH を変更しない (もし変えるなら旧 `.cache/` を新パスにコピー)
+
+`CACHE_DIR` を bot ディレクトリの外に置けば、デプロイ・clone・rm 全部から物理的に分離されて事故が起きにくい。
 
 ## 運用コマンド
 

@@ -2,7 +2,10 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 
 import { join, dirname } from 'node:path';
 import matter from 'gray-matter';
 
-const CACHE_PATH = join(process.cwd(), '.cache', 'channels.json');
+const CACHE_BASE = process.env.CACHE_DIR
+  ? process.env.CACHE_DIR
+  : join(process.cwd(), '.cache');
+const CACHE_PATH = join(CACHE_BASE, 'channels.json');
 
 type ChannelMap = Record<string, string>;
 
