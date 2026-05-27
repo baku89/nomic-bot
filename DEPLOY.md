@@ -51,30 +51,62 @@ ssh-keygen -t ed25519 -f ~/.ssh/nomic-deploy -C "nomic-deploy"
 ### 5. VPS初回セットアップ (これだけ手動)
 
 ```bash
-# 1. Node.js 20+, yarn, git, pm2
+ssh user@vps
+
+# (1) Node.js 20+, yarn, git, pm2
 sudo apt update && sudo apt install -y nodejs npm git
 sudo npm install -g yarn pm2
 
-# 2. botコードをclone (パスはVPS_PATHと一致させる)
-git clone <github-repo-url> ~/nomic-bot
+# (2) CI 用 SSH key (LOCAL から受け取る)
+# LOCAL で `ssh-keygen -t ed25519 -f ~/.ssh/nomic-deploy -N "" -C "nomic-deploy"`
+# その公開鍵を以下に追記
+$EDITOR ~/.ssh/authorized_keys  # ~/.ssh/nomic-deploy.pub の中身を貼る
+chmod 600 ~/.ssh/authorized_keys
+
+# (3) nomic-games 書き込み用 SSH key (VPS → GitHub)
+ssh-keygen -t ed25519 -f ~/.ssh/nomic-games -N "" -C "nomic-bot@vps"
+cat ~/.ssh/nomic-games.pub
+# → この公開鍵を GitHub の nomic-games リポの
+#   Settings → Deploy keys → "Add deploy key"
+#   - Title: "vps-write"
+#   - Key: 上記公開鍵
+#   - ✅ Allow write access  ← 重要
+#
+# ssh config で github 接続にこの鍵を使うよう設定
+cat >> ~/.ssh/config <<'EOF'
+Host github.com
+  IdentityFile ~/.ssh/nomic-games
+  StrictHostKeyChecking accept-new
+EOF
+chmod 600 ~/.ssh/config
+
+# (4) Bot コードを clone (パスは GitHub Secrets の VPS_PATH と一致させる)
+git clone https://github.com/baku89/nomic-bot.git ~/nomic-bot
 cd ~/nomic-bot
 
-# 3. .env を設定
+# (5) .env を設定
 cp .env.example .env
-$EDITOR .env                   # トークン・キー・パスを記入
+$EDITOR .env
+# 必須: DISCORD_BOT_TOKEN, DISCORD_CLIENT_ID, GEMINI_API_KEY
+# 必須: GAMES_DIR=/var/lib/nomic-games
+# 推奨: MAINTAINER_DISCORD_ID=<自分の Discord User ID>
 
-# 4. ゲーム保管用ディレクトリ (別gitリポ)
+# (6) ゲーム保管用リポを GitHub から SSH で clone (deploy key が効く)
 sudo mkdir -p /var/lib/nomic-games
 sudo chown $USER:$USER /var/lib/nomic-games
+git clone git@github.com:baku89/nomic-games.git /var/lib/nomic-games
 cd /var/lib/nomic-games
-git init -b main
-git config user.email "nomic-bot@localhost"
+git config user.email "nomic-bot@vps"
 git config user.name "Nomic Bot"
+
+# 動作確認: 空コミットして push が通れば deploy key OK
+git commit --allow-empty -m "VPS 接続テスト"
+git push origin main
 cd ~/nomic-bot
 
-# 5. pm2 を OS起動時に自動再開させる準備
-pm2 startup                    # 出てきたコマンドをsudoで実行
-# ※ Bot 自体の最初の起動は CI に任せて OK (次節)
+# (7) pm2 を OS 起動時に自動再開
+pm2 startup                    # 出力された sudo コマンドを実行
+# Bot 本体の起動は CI に任せる (次節)
 ```
 
 ## 自動デプロイ (これ以降は手動操作不要)
