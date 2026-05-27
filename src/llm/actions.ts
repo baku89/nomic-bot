@@ -24,11 +24,18 @@ export const noopActionSchema = z.object({
   reason: z.string(),
 });
 
+export const proposeGameEndActionSchema = z.object({
+  type: z.literal('propose_game_end'),
+  winner_mention: z.string().nullable(),
+  reason: z.string(),
+});
+
 export const actionSchema = z.discriminatedUnion('type', [
   startGameActionSchema,
   postMessageActionSchema,
   mentionPlayerActionSchema,
   noopActionSchema,
+  proposeGameEndActionSchema,
 ]);
 
 export const llmResponseSchema = z.object({

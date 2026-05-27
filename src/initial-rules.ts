@@ -10,7 +10,9 @@ export const MINIMUM_NOMIC_RULES: string[] = [
   '109. ルールの解釈に争いが生じた場合、参加者リストにおいて現在の手番プレイヤーの直後にあたるプレイヤー (最後尾の場合は先頭のプレイヤー) を裁定者とする。裁定者の判断は、裁定者を除く全プレイヤーの一致でのみ覆すことができる。',
 ];
 
-export const INITIAL_BOT_INSTRUCTIONS: string[] = [
+// Kept as reference for prompts. No longer written into per-game .md files
+// (the bot's behavior lives in code/prompts, not in game state).
+export const BOT_BEHAVIOR_GUIDELINES: string[] = [
   '手番開始時、手番プレイヤーをメンションし、提案期限 (デフォルト24時間) を**相対時間と絶対時刻 (JST) の両方**で告知する。例: 「あなたの手番です。24時間以内 (5月28日 21:30 JST まで) に `/propose <提案文>` で提案してください」。',
   '提案期限を経過しても提案がなければ、自動的にpass扱いとして次の手番へ進む (暫定処置、ルール改変対象)。',
   '提案受領時、提案テキストを解釈し op (制定/廃止/修正)・対象ルール番号・新本文を抽出する。',

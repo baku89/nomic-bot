@@ -23,5 +23,18 @@ export class GitGameRepo {
   async commit(message: string, files: string[] = ['.']): Promise<void> {
     await this.git.add(files);
     await this.git.commit(message);
+    await this.tryPush();
+  }
+
+  private async tryPush(): Promise<void> {
+    try {
+      const remotes = await this.git.getRemotes(true);
+      const hasOrigin = remotes.some((r) => r.name === 'origin' && r.refs?.push);
+      if (!hasOrigin) return;
+      await this.git.push();
+      console.log('[git] pushed to origin');
+    } catch (err) {
+      console.warn('[git] push failed (continuing):', (err as Error).message);
+    }
   }
 }
