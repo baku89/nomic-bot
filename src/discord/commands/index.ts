@@ -2,6 +2,7 @@ import type { ChatInputCommandInteraction, Message, SendableChannels } from 'dis
 import type { Config } from '../../config.js';
 import { findGameByChannel, endGame, writeGame, mentionOf } from '../../game/state.js';
 import { GitGameRepo } from '../../git/commit.js';
+import { getGamesRepoUrl, gameFileUrl } from '../../game/repo-url.js';
 import { createLLMProvider } from '../../llm/index.js';
 import { interpretProposal } from '../../llm/propose-interpreter.js';
 import { formatDeadlineJST, hoursFromNow } from '../../utils/time.js';
@@ -15,9 +16,6 @@ export async function handleInteraction(
   switch (interaction.commandName) {
     case 'start':
       await handleStart(interaction, config);
-      break;
-    case 'rules':
-      await handleRules(interaction, config);
       break;
     case 'status':
       await handleStatus(interaction, config);
@@ -179,31 +177,17 @@ async function handleEnd(
     : `[${game.name}] ゲーム強制終了${reason ? `: ${reason}` : ''}`;
   await repo.commit(commitMsg);
 
+  const repoUrl = await getGamesRepoUrl(config.gamesDir);
+  const url = repoUrl ? gameFileUrl(repoUrl, game.name, true) : null;
   const lines = [
     `**ゲーム「${game.name}」が終了しました。** (強制終了 by <@${interaction.user.id}>)`,
     winner ? `🏆 勝者: <@${winner.id}>` : '勝者: なし',
   ];
   if (reason) lines.push(`理由: ${reason}`);
   lines.push(`最終ルール数: ${game.rules.length} 条`);
-  lines.push(`アーカイブ: \`archive/${game.name}.md\``);
+  if (url) lines.push(`📄 アーカイブ: ${url}`);
 
   await interaction.reply(lines.join('\n'));
-}
-
-async function handleRules(
-  interaction: ChatInputCommandInteraction,
-  config: Config,
-): Promise<void> {
-  const game = findGameByChannel(config.gamesDir, interaction.channelId);
-  if (!game) {
-    await interaction.reply({
-      content: 'このチャンネルにはまだゲームがありません。',
-      ephemeral: true,
-    });
-    return;
-  }
-  const body = game.rules.map((r) => `- ${r}`).join('\n');
-  await interaction.reply({ content: `**${game.name} のルール**\n${body}` });
 }
 
 async function handleStatus(
@@ -218,16 +202,48 @@ async function handleStatus(
     });
     return;
   }
+  const repoUrl = await getGamesRepoUrl(config.gamesDir);
+  const url = repoUrl ? gameFileUrl(repoUrl, game.name, false) : null;
   const activeText = game.frontmatter.active_proposal
     ? `あり (${game.frontmatter.active_proposal.interpretation})`
     : 'なし';
-  const lines = [
+
+  const header = [
     `**ゲーム: ${game.name}**`,
+    ...(url ? [`📄 ${url}`] : []),
     `ステータス: ${game.frontmatter.status}`,
     `参加者: ${game.participants.map((p) => mentionOf(p)).join(' ')}`,
     `現在の手番: ${game.frontmatter.current_turn ? `<@${game.frontmatter.current_turn}>` : 'なし'}`,
     `進行中の提案: ${activeText}`,
-    `ルール数: ${game.rules.length}`,
-  ];
-  await interaction.reply({ content: lines.join('\n') });
+    '',
+    `**ルール (全 ${game.rules.length} 条)**`,
+  ].join('\n');
+  const ruleBody = game.rules.map((r) => `- ${r}`).join('\n');
+  const full = `${header}\n${ruleBody}`;
+
+  const MAX = 1900;
+  if (full.length <= MAX) {
+    await interaction.reply({ content: full });
+    return;
+  }
+  const chunks = splitByLines(full, MAX);
+  await interaction.reply({ content: chunks[0] });
+  for (let i = 1; i < chunks.length; i++) {
+    await interaction.followUp({ content: chunks[i] });
+  }
+}
+
+function splitByLines(content: string, max: number): string[] {
+  const chunks: string[] = [];
+  let buf = '';
+  for (const line of content.split('\n')) {
+    if ((buf + '\n' + line).length > max) {
+      chunks.push(buf);
+      buf = line;
+    } else {
+      buf = buf ? `${buf}\n${line}` : line;
+    }
+  }
+  if (buf) chunks.push(buf);
+  return chunks;
 }

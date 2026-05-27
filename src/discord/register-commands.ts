@@ -17,8 +17,9 @@ const commands = [
     .addStringOption((o) =>
       o.setName('text').setDescription('提案文 (自由テキスト)').setRequired(true),
     ),
-  new SlashCommandBuilder().setName('rules').setDescription('現在のルールブックを表示'),
-  new SlashCommandBuilder().setName('status').setDescription('現在のゲーム状態を表示'),
+  new SlashCommandBuilder()
+    .setName('status')
+    .setDescription('現在のゲーム状態とルール一覧を表示'),
   new SlashCommandBuilder()
     .setName('end')
     .setDescription('ゲームを強制終了する')

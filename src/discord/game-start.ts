@@ -10,6 +10,7 @@ import {
   type Game,
 } from '../game/state.js';
 import { GitGameRepo } from '../git/commit.js';
+import { getGamesRepoUrl, gameFileUrl } from '../game/repo-url.js';
 import { formatDeadlineJST, hoursFromNow } from '../utils/time.js';
 
 export type StartGameResult =
@@ -66,12 +67,16 @@ export async function startGameAndAnnounce(opts: {
       .join(', ')})`,
   );
 
+  const repoUrl = await getGamesRepoUrl(opts.config.gamesDir);
+  const gameUrl = repoUrl ? gameFileUrl(repoUrl, game.name, false) : null;
+
   const announcement = buildOpeningAnnouncement({
     gameName: game.name,
     participantMentions: participants.map((p) => mentionOf(p)),
     firstPlayerMention: participants[0] ? mentionOf(participants[0]) : '(参加者未指定)',
     proposalDeadline: formatDeadlineJST(hoursFromNow(24)),
     rules: game.rules,
+    gameUrl,
   });
   await sendLongMessage(opts.channel, announcement);
 
@@ -107,9 +112,11 @@ function buildOpeningAnnouncement(opts: {
   firstPlayerMention: string;
   proposalDeadline: string;
   rules: string[];
+  gameUrl: string | null;
 }): string {
   return [
     `**ゲーム「${opts.gameName}」を開始しました。** (ミニマムノミック / 全 9 条)`,
+    ...(opts.gameUrl ? [`📄 進行状況: ${opts.gameUrl}`] : []),
     '',
     'ノミックは「ルールを変えていくゲーム」です。プレイヤーは順番にルール改変を提案し、**全員一致**で採択されます。採択されたルールは即座に発効するため、ゲームのあり方そのものが変わっていきます。勝利条件すら最初は定められていません — それも今後の議論で決まります。',
     '',
@@ -122,7 +129,7 @@ function buildOpeningAnnouncement(opts: {
     '**初期ルール (全 9 条)**',
     ...opts.rules.map((r) => `- ${r}`),
     '',
-    '以降は `/rules` でいつでも再表示、`/status` で現在の状態を確認できます。',
+    '以降は `/status` でゲーム状態とルール一覧を再表示できます。',
     '',
     `${opts.firstPlayerMention} さん、あなたの手番です。**24時間以内 (${opts.proposalDeadline} まで)** に \`/propose <提案文>\` で提案してください。`,
   ].join('\n');

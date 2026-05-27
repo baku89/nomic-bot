@@ -20,6 +20,7 @@ import { formatDeadlineJST, hoursFromNow } from '../utils/time.js';
 import { createLLMProvider } from '../llm/index.js';
 import { checkForWinner } from '../llm/win-check.js';
 import { postEndConfirmation } from './end-confirmation.js';
+import { getGamesRepoUrl, gameFileUrl } from '../game/repo-url.js';
 
 export const VOTE_YES = '✅';
 export const VOTE_NO = '❌';
@@ -181,13 +182,15 @@ async function tallyEndConfirmation(message: Message, game: Game, config: Config
   await repo.commit(commitMsg);
 
   if (message.channel.isSendable()) {
+    const repoUrl = await getGamesRepoUrl(config.gamesDir);
+    const url = repoUrl ? gameFileUrl(repoUrl, refreshed.name, true) : null;
     const lines = [
       `🏁 **ゲーム「${refreshed.name}」が終了しました。** (参加者全員合意)`,
       pending.winner_mention ? `🏆 勝者: ${pending.winner_mention}` : '勝者: なし',
       `理由: ${pending.reason}`,
       `最終ルール数: ${refreshed.rules.length} 条`,
-      `アーカイブ: \`archive/${refreshed.name}.md\``,
     ];
+    if (url) lines.push(`📄 アーカイブ: ${url}`);
     await message.channel.send(lines.join('\n'));
   }
 }

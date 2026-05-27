@@ -106,7 +106,7 @@ function buildHelpMessage(
     return [
       `指示として解釈できませんでした。(理由: ${reason})`,
       `現在このチャンネルではゲーム「${existingGame.name}」が進行中です。`,
-      '`/status` で現在の状態、`/rules` でルール一覧を確認できます。',
+      '`/status` で現在の状態とルール一覧を確認できます。',
     ].join('\n');
   }
   return [
