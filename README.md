@@ -12,7 +12,7 @@
 - **提案**: `/propose <自由テキスト>` で LLM が op (制定/廃止/修正)・対象ルール番号・新本文を解釈
 - **採決**: 提案メッセージの ✅ / ❌ / 🤷 リアクションで全会一致採決 (Rule 105)
 - **自動勝者検出**: ルール採択後に LLM が「勝者出てる?」をチェック、参加者全員の絵文字合意で `/end` 相当を実行
-- **強制終了**: `/end winner:<user> reason:<text>` (allowlist 権限が必要)
+- **強制終了**: `/end winner:<user> reason:<text>` (チャンネルに居れば誰でも実行可)
 - **記録**: 全ルール改変は別リポ ([baku89/nomic-games](https://github.com/baku89/nomic-games)) に 1 コミット = 1 改変として残る (コミットメッセージ = 提案文)
 
 ## アーキテクチャ
@@ -31,7 +31,6 @@
 ```bash
 yarn install
 cp .env.example .env          # トークン・キー・GAMES_DIR を記入
-cp config/allowlist.example.json config/allowlist.json
 yarn register-commands         # スラッシュコマンドを Discord に登録 (グローバル、反映に最大1h)
 yarn dev                       # tsx watch でホットリロード
 yarn typecheck

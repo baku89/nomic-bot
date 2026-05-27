@@ -37,13 +37,6 @@ async function handleStart(
   interaction: ChatInputCommandInteraction,
   config: Config,
 ): Promise<void> {
-  if (!config.allowlist.includes(interaction.user.id)) {
-    await interaction.reply({
-      content: 'ゲーム開始は allowlist に登録されたアカウントだけが行えます。',
-      ephemeral: true,
-    });
-    return;
-  }
   const name = interaction.options.getString('name', true);
   const playersStr = interaction.options.getString('players', true);
   const mentions = playersStr.match(/<@!?\d+>/g) ?? [];
@@ -161,14 +154,6 @@ async function handleEnd(
   interaction: ChatInputCommandInteraction,
   config: Config,
 ): Promise<void> {
-  if (!config.allowlist.includes(interaction.user.id)) {
-    await interaction.reply({
-      content: 'ゲームの強制終了は allowlist に登録されたアカウントだけが行えます。',
-      ephemeral: true,
-    });
-    return;
-  }
-
   const game = findGameByChannel(config.gamesDir, interaction.channelId);
   if (!game) {
     await interaction.reply({

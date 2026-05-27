@@ -8,13 +8,6 @@ import { postEndConfirmation } from './end-confirmation.js';
 import { startGameAndAnnounce } from './game-start.js';
 
 export async function handleMention(message: Message, config: Config): Promise<void> {
-  if (!config.allowlist.includes(message.author.id)) {
-    console.log(
-      `[mention] ignored from non-allowlisted user ${message.author.id} (${message.author.username})`,
-    );
-    return;
-  }
-
   const existingGame = findGameByChannel(config.gamesDir, message.channelId);
   const gameContext = existingGame
     ? `ゲーム名: ${existingGame.name}\nステータス: ${existingGame.frontmatter.status}\n参加者数: ${existingGame.participants.length}`
@@ -123,7 +116,5 @@ function buildHelpMessage(
     `> @${botDisplayName} <@参加者1> <@参加者2> 「myname」というゲームを始めましょう。`,
     '',
     'または \`/start name:<名前> players:@参加者...\` でも開始できます。',
-    '',
-    '※ ゲーム開始は allowlist に登録されたアカウントのみが実行できます。',
   ].join('\n');
 }

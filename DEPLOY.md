@@ -22,11 +22,11 @@ https://aistudio.google.com/app/apikey
 
 「Create API key」 → `GEMINI_API_KEY` (無料枠でこのBot規模なら十分)
 
-### 3. 自分のDiscord User ID
-Discord クライアントで:
+### 3. メンテナの Discord User ID (任意、推奨)
+LLM API のレート超過などエラー時に Bot がメンションする宛先。
 - 設定 → 詳細設定 → **開発者モード** をオン
 - 自分の名前を右クリック → 「ユーザーIDをコピー」
-- このIDを `config/allowlist.json` に入れる
+- `.env` の `MAINTAINER_DISCORD_ID` に設定
 
 ### 4. GitHub
 このコードをpushするrepoを用意 (private/publicどちらでも)。
@@ -59,11 +59,9 @@ sudo npm install -g yarn pm2
 git clone <github-repo-url> ~/nomic-bot
 cd ~/nomic-bot
 
-# 3. .env と allowlist
+# 3. .env を設定
 cp .env.example .env
 $EDITOR .env                   # トークン・キー・パスを記入
-cp config/allowlist.example.json config/allowlist.json
-$EDITOR config/allowlist.json  # 自分のDiscord User IDを入れる
 
 # 4. ゲーム保管用ディレクトリ (別gitリポ)
 sudo mkdir -p /var/lib/nomic-games

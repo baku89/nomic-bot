@@ -4,7 +4,7 @@ import { REST, Routes, SlashCommandBuilder } from 'discord.js';
 const commands = [
   new SlashCommandBuilder()
     .setName('start')
-    .setDescription('新規ゲームを開始する (allowlist権限が必要)')
+    .setDescription('新規ゲームを開始する')
     .addStringOption((o) =>
       o.setName('name').setDescription('ゲーム名 (英数字・ハイフン・アンダースコア)').setRequired(true),
     )
@@ -21,7 +21,7 @@ const commands = [
   new SlashCommandBuilder().setName('status').setDescription('現在のゲーム状態を表示'),
   new SlashCommandBuilder()
     .setName('end')
-    .setDescription('ゲームを強制終了する (allowlist権限が必要)')
+    .setDescription('ゲームを強制終了する')
     .addUserOption((o) =>
       o.setName('winner').setDescription('勝者 (任意)').setRequired(false),
     )
