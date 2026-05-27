@@ -144,6 +144,7 @@ async function handlePropose(
     targetRuleNumber: interp.target_rule_number,
     newRuleText: interp.new_rule_text,
     deadlineStr,
+    voterMentions: game.participants.map((p) => mentionOf(p)),
   });
 
   const reply = await interaction.editReply({ content: proposalContent });

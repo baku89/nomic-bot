@@ -8,6 +8,7 @@ export function buildProposalMessageContent(opts: {
   targetRuleNumber: number | null;
   newRuleText: string | null;
   deadlineStr: string;
+  voterMentions: string[];
   amendedFromOriginal?: boolean;
   amendReason?: string;
 }): string {
@@ -28,8 +29,11 @@ export function buildProposalMessageContent(opts: {
   lines.push(`**解釈**: ${opts.interpretation}`);
   lines.push(`操作: ${opLabel}${targetPart}${newTextPart}`);
   lines.push('');
+  if (opts.voterMentions.length > 0) {
+    lines.push(`🗳️ ${opts.voterMentions.join(' ')} 投票してください:`);
+  }
   lines.push(
-    `参加者全員が ${VOTE_YES} 賛成 / ${VOTE_NO} 反対 / ${VOTE_ABSTAIN} 棄権 で投票してください。`,
+    `${VOTE_YES} 賛成 / ${VOTE_NO} 反対 / ${VOTE_ABSTAIN} 棄権`,
   );
   lines.push(
     `**${opts.deadlineStr} まで**に全員の投票が揃えば即時集計、全員一致 (棄権は除外) で採択されます。`,

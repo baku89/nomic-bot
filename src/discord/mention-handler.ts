@@ -172,6 +172,7 @@ async function handleAmendProposal(
     targetRuleNumber: proposal.target_rule_number,
     newRuleText: proposal.new_rule_text,
     deadlineStr,
+    voterMentions: existingGame.participants.map((p) => `<@${p.discordId}>`),
     amendedFromOriginal: true,
     amendReason: action.reason,
   });
