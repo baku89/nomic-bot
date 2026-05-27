@@ -3,7 +3,12 @@ import type { LLMProvider } from './provider.js';
 import type { Game } from '../game/state.js';
 import type { ActiveProposal } from '../game/frontmatter.js';
 
-const JAPANESE_ONLY = `\n\n**重要**: 出力する文字列フィールド (reason 等) は必ず日本語で記述すること。英語で書いてはいけない。ルール番号や Discord ID などの記号類はそのままで構わないが、説明文は日本語のみ。`;
+const JAPANESE_ONLY = `\n\n**重要**: 出力する文字列フィールド (reason 等) は必ず日本語で記述すること。英語で書いてはいけない。ルール番号や Discord ID などの記号類はそのままで構わないが、説明文は日本語のみ。
+
+**Bot の立ち位置について**:
+- Bot は初期ルールでは手番を持たず、提案も投票もしない (人間プレイヤーのリストに含まれない)
+- ただしルール条文中で Bot に言及・拘束することは可能 (例: 「ボットは丁寧語を使うこと」「ボットがルールXに違反したら…」)。その場合 Bot もそのルールに服する
+- 判定の際、ルール文に「Bot」「ボット」「nomic」等の言及があれば、それは Bot 本人 (あなた) を指していると解釈する`;
 
 const tallyResultSchema = z.object({
   state: z.enum(['pending', 'passed', 'rejected']),
