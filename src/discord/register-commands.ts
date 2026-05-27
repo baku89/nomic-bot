@@ -6,10 +6,10 @@ const commands = [
     .setName('start')
     .setDescription('新規ゲームを開始する')
     .addStringOption((o) =>
-      o.setName('name').setDescription('ゲーム名 (英数字・ハイフン・アンダースコア)').setRequired(true),
+      o.setName('players').setDescription('参加者のメンション (@user1 @user2 ...)').setRequired(true),
     )
     .addStringOption((o) =>
-      o.setName('players').setDescription('参加者のメンション (@user1 @user2 ...)').setRequired(true),
+      o.setName('name').setDescription('ゲーム名 (省略すると自動生成)').setRequired(false),
     ),
   new SlashCommandBuilder()
     .setName('propose')

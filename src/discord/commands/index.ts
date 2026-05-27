@@ -35,9 +35,10 @@ async function handleStart(
   interaction: ChatInputCommandInteraction,
   config: Config,
 ): Promise<void> {
-  const name = interaction.options.getString('name', true);
+  const providedName = interaction.options.getString('name', false);
   const playersStr = interaction.options.getString('players', true);
   const mentions = playersStr.match(/<@!?\d+>/g) ?? [];
+  const name = providedName?.trim() || autoGameName();
 
   if (!interaction.channel?.isSendable()) {
     await interaction.reply({ content: 'このチャンネルには送信できません。', ephemeral: true });
@@ -265,6 +266,12 @@ async function handleStatus(
   for (let i = 1; i < chunks.length; i++) {
     await interaction.followUp({ content: chunks[i] });
   }
+}
+
+function autoGameName(): string {
+  const d = new Date();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `game-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 
 function splitByLines(content: string, max: number): string[] {
