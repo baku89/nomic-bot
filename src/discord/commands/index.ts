@@ -8,6 +8,7 @@ import { interpretProposal } from '../../llm/propose-interpreter.js';
 import { formatDeadlineJST, hoursFromNow } from '../../utils/time.js';
 import { VOTE_YES, VOTE_NO, VOTE_ABSTAIN } from '../reactions.js';
 import { startGameAndAnnounce } from '../game-start.js';
+import { buildProposalMessageContent } from '../proposal-message.js';
 
 export async function handleInteraction(
   interaction: ChatInputCommandInteraction,
@@ -135,22 +136,15 @@ async function handlePropose(
   const voteDeadline = hoursFromNow(24);
   const deadlineStr = formatDeadlineJST(voteDeadline);
 
-  const opLabel = interp.op === 'enact' ? '制定' : interp.op === 'modify' ? '修正' : '廃止';
-  const targetPart = interp.target_rule_number !== null ? ` Rule ${interp.target_rule_number}` : '';
-  const newTextPart = interp.new_rule_text ? `\n新本文: ${interp.new_rule_text}` : '';
-
-  const proposalContent = [
-    `📝 **提案** by <@${interaction.user.id}>`,
-    '',
-    `> ${text.split('\n').join('\n> ')}`,
-    '',
-    `**解釈**: ${interp.interpretation}`,
-    `操作: ${opLabel}${targetPart}${newTextPart}`,
-    '',
-    `参加者全員が ${VOTE_YES} (yes) / ${VOTE_NO} (no) / ${VOTE_ABSTAIN} (棄権) で投票してください。`,
-    `**24時間以内 (${deadlineStr} まで)** に全員の投票が揃えば即時集計、全員一致 (棄権は除外) で採択されます。`,
-    `(意図と異なる場合は管理者に \`/end\` での介入を依頼してください)`,
-  ].join('\n');
+  const proposalContent = buildProposalMessageContent({
+    proposerId: interaction.user.id,
+    rawText: text,
+    interpretation: interp.interpretation,
+    op: interp.op,
+    targetRuleNumber: interp.target_rule_number,
+    newRuleText: interp.new_rule_text,
+    deadlineStr,
+  });
 
   const reply = await interaction.editReply({ content: proposalContent });
   const proposalMsg = reply as Message;

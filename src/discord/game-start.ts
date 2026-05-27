@@ -6,6 +6,7 @@ import {
   createNewGame,
   writeGame,
   mentionOf,
+  judgeFor,
   type Participant,
   type Game,
 } from '../game/state.js';
@@ -80,10 +81,14 @@ export async function startGameAndAnnounce(opts: {
   const repoUrl = await getGamesRepoUrl(opts.config.gamesDir);
   const gameUrl = repoUrl ? gameFileUrl(repoUrl, game.fileStem, false) : null;
 
+  const judge = judgeFor(game);
+  const judgeMention = judge ? mentionOf(judge) : null;
+
   const announcement = buildOpeningAnnouncement({
     gameName: game.name,
     participantMentions: participants.map((p) => mentionOf(p)),
     firstPlayerMention: participants[0] ? mentionOf(participants[0]) : '(参加者未指定)',
+    judgeMention,
     proposalDeadline: formatDeadlineJST(hoursFromNow(24)),
     rules: game.rules,
     gameUrl,
@@ -128,6 +133,7 @@ function buildOpeningAnnouncement(opts: {
   gameName: string;
   participantMentions: string[];
   firstPlayerMention: string;
+  judgeMention: string | null;
   proposalDeadline: string;
   rules: string[];
   gameUrl: string | null;
@@ -145,6 +151,7 @@ function buildOpeningAnnouncement(opts: {
     '**初期条件**',
     `- 参加者 (この順で手番): ${opts.participantMentions.join(' → ')}`,
     `- 最初の手番: ${opts.firstPlayerMention}`,
+    ...(opts.judgeMention ? [`- 現在の裁定者 (Rule 109): ${opts.judgeMention}`] : []),
     '- 採択要件: 全員一致 (Rule 105)',
     '- 勝利条件: 未定 (ルール改変で設定可能)',
     '',

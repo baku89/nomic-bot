@@ -30,12 +30,28 @@ export const proposeGameEndActionSchema = z.object({
   reason: z.string(),
 });
 
+export const amendActiveProposalActionSchema = z.object({
+  type: z.literal('amend_active_proposal'),
+  op: z.enum(['enact', 'modify', 'repeal']),
+  target_rule_number: z.number().int().nullable(),
+  new_rule_text: z.string().nullable(),
+  interpretation: z.string(),
+  reason: z.string(),
+});
+
+export const raiseDisputeActionSchema = z.object({
+  type: z.literal('raise_dispute'),
+  reason: z.string(),
+});
+
 export const actionSchema = z.discriminatedUnion('type', [
   startGameActionSchema,
   postMessageActionSchema,
   mentionPlayerActionSchema,
   noopActionSchema,
   proposeGameEndActionSchema,
+  amendActiveProposalActionSchema,
+  raiseDisputeActionSchema,
 ]);
 
 export const llmResponseSchema = z.object({

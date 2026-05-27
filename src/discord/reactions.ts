@@ -12,6 +12,7 @@ import {
   writeGame,
   advanceTurn,
   endGame,
+  judgeFor,
   type Game,
 } from '../game/state.js';
 import { applyProposal } from '../game/rule-mutations.js';
@@ -119,10 +120,14 @@ async function tallyAndMaybeFinalize(
     const nextPlayerId = updatedGame.frontmatter.current_turn;
     if (nextPlayerId) {
       const nextDeadline = formatDeadlineJST(hoursFromNow(24));
+      const judge = judgeFor(updatedGame);
       lines.push('');
       lines.push(
         `<@${nextPlayerId}> さん、あなたの手番です。**24時間以内 (${nextDeadline} まで)** に \`/propose <提案文>\` で提案してください。`,
       );
+      if (judge) {
+        lines.push(`今手番の裁定者 (Rule 109): <@${judge.discordId}>`);
+      }
     }
     await message.channel.send(lines.join('\n'));
   }
