@@ -21,7 +21,8 @@ export type Participant = {
 };
 
 export type Game = {
-  name: string;
+  name: string;       // user-facing short name (e.g., "myname")
+  fileStem: string;   // file stem on disk (e.g., "2026-05-27-myname"); always used for I/O
   frontmatter: GameFrontmatter;
   participants: Participant[];
   rules: string[];
@@ -35,27 +36,36 @@ export function displayOf(p: Participant): string {
   return p.username ? `@${p.username}` : `<@${p.discordId}>`;
 }
 
-function gamePath(gamesDir: string, name: string): string {
-  return join(gamesDir, `${name}.md`);
+function gamePath(gamesDir: string, fileStem: string): string {
+  return join(gamesDir, `${fileStem}.md`);
 }
 
-export function gameExists(gamesDir: string, name: string): boolean {
-  return existsSync(gamePath(gamesDir, name));
+function extractShortName(fileStem: string): string {
+  const m = /^\d{4}-\d{2}-\d{2}-(.+)$/.exec(fileStem);
+  return m ? m[1] : fileStem;
 }
 
-export function listActiveGames(gamesDir: string): string[] {
-  if (!existsSync(gamesDir)) return [];
-  return readdirSync(gamesDir).filter(
-    (f) => f.endsWith('.md') && f !== 'README.md',
+export function gameNameTaken(gamesDir: string, name: string): boolean {
+  if (!existsSync(gamesDir)) return false;
+  return readdirSync(gamesDir).some(
+    (f) => f === `${name}.md` || f.endsWith(`-${name}.md`),
   );
 }
 
-export function readGame(gamesDir: string, name: string): Game {
-  const path = gamePath(gamesDir, name);
+export function listActiveStems(gamesDir: string): string[] {
+  if (!existsSync(gamesDir)) return [];
+  return readdirSync(gamesDir)
+    .filter((f) => f.endsWith('.md') && f !== 'README.md')
+    .map((f) => f.replace(/\.md$/, ''));
+}
+
+export function readGame(gamesDir: string, fileStem: string): Game {
+  const path = gamePath(gamesDir, fileStem);
   const content = readFileSync(path, 'utf-8');
   const { frontmatter, body } = parseGameFile(content);
   return {
-    name,
+    name: extractShortName(fileStem),
+    fileStem,
     frontmatter,
     ...parseBody(body),
   };
@@ -64,16 +74,16 @@ export function readGame(gamesDir: string, name: string): Game {
 export function writeGame(gamesDir: string, game: Game): void {
   const body = renderBody(game);
   const content = serializeGameFile(game.frontmatter, body);
-  const path = gamePath(gamesDir, game.name);
+  const path = gamePath(gamesDir, game.fileStem);
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, content);
 }
 
 export function findGameByChannel(gamesDir: string, channelId: string): Game | null {
-  const name = getGameByChannel(channelId);
-  if (!name) return null;
-  if (!gameExists(gamesDir, name)) return null;
-  return readGame(gamesDir, name);
+  const stem = getGameByChannel(channelId);
+  if (!stem) return null;
+  if (!existsSync(gamePath(gamesDir, stem))) return null;
+  return readGame(gamesDir, stem);
 }
 
 function parseBody(body: string): {
@@ -115,7 +125,6 @@ function parseListItems(text: string): string[] {
 
 function parseParticipants(text: string): Participant[] {
   return parseListItems(text).map((line) => {
-    // Format: "@username (123456789)" or "<@123> (123)" (legacy)
     const m = /^(@?\S+?)\s*\((\d+)\)\s*$/.exec(line);
     if (m) {
       let username = m[1];
@@ -201,13 +210,13 @@ export function endGame(
 
   const archiveDir = join(gamesDir, 'archive');
   mkdirSync(archiveDir, { recursive: true });
-  const archivePath = join(archiveDir, `${game.name}.md`);
+  const archivePath = join(archiveDir, `${game.fileStem}.md`);
   writeFileSync(archivePath, content);
 
-  const activePath = join(gamesDir, `${game.name}.md`);
+  const activePath = gamePath(gamesDir, game.fileStem);
   if (existsSync(activePath)) unlinkSync(activePath);
 
-  clearGameFromCache(game.name);
+  clearGameFromCache(game.fileStem);
 
   return { archivePath };
 }
@@ -216,11 +225,14 @@ export function createNewGame(opts: {
   name: string;
   participants: Participant[];
 }): Game {
+  const startedAt = new Date().toISOString();
+  const datePrefix = startedAt.slice(0, 10);
   return {
     name: opts.name,
+    fileStem: `${datePrefix}-${opts.name}`,
     frontmatter: {
       status: 'active',
-      started_at: new Date().toISOString(),
+      started_at: startedAt,
       current_turn: opts.participants[0]?.discordId ?? null,
       active_proposal: null,
       pending_end: null,

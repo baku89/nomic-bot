@@ -213,7 +213,7 @@ async function handleEnd(
   await repo.commit(commitMsg);
 
   const repoUrl = await getGamesRepoUrl(config.gamesDir);
-  const url = repoUrl ? gameFileUrl(repoUrl, game.name, true) : null;
+  const url = repoUrl ? gameFileUrl(repoUrl, game.fileStem, true) : null;
   const lines = [
     `**ゲーム「${game.name}」が終了しました。** (強制終了 by <@${interaction.user.id}>)`,
     winner ? `🏆 勝者: <@${winner.id}>` : '勝者: なし',
@@ -238,7 +238,7 @@ async function handleStatus(
     return;
   }
   const repoUrl = await getGamesRepoUrl(config.gamesDir);
-  const url = repoUrl ? gameFileUrl(repoUrl, game.name, false) : null;
+  const url = repoUrl ? gameFileUrl(repoUrl, game.fileStem, false) : null;
   const activeText = game.frontmatter.active_proposal
     ? `あり (${game.frontmatter.active_proposal.interpretation})`
     : 'なし';

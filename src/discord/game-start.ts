@@ -2,7 +2,7 @@ import type { Client, SendableChannels } from 'discord.js';
 import type { Config } from '../config.js';
 import {
   findGameByChannel,
-  gameExists,
+  gameNameTaken,
   createNewGame,
   writeGame,
   mentionOf,
@@ -26,7 +26,7 @@ export async function startGameAndAnnounce(opts: {
   botUserId: string;
   config: Config;
 }): Promise<StartGameResult> {
-  if (gameExists(opts.config.gamesDir, opts.name)) {
+  if (gameNameTaken(opts.config.gamesDir, opts.name)) {
     return {
       ok: false,
       error: `ゲーム名「${opts.name}」は既に存在します。別の名前を指定してください。`,
@@ -58,8 +58,8 @@ export async function startGameAndAnnounce(opts: {
     participants,
   });
   writeGame(opts.config.gamesDir, game);
-  setChannelGame(opts.channel.id, game.name);
-  console.log(`[start] wrote ${opts.name}.md and cached channel mapping`);
+  setChannelGame(opts.channel.id, game.fileStem);
+  console.log(`[start] wrote ${game.fileStem}.md and cached channel mapping`);
 
   let starterUsername = '';
   try {
@@ -78,7 +78,7 @@ export async function startGameAndAnnounce(opts: {
   console.log(`[start] committed`);
 
   const repoUrl = await getGamesRepoUrl(opts.config.gamesDir);
-  const gameUrl = repoUrl ? gameFileUrl(repoUrl, game.name, false) : null;
+  const gameUrl = repoUrl ? gameFileUrl(repoUrl, game.fileStem, false) : null;
 
   const announcement = buildOpeningAnnouncement({
     gameName: game.name,
@@ -87,6 +87,7 @@ export async function startGameAndAnnounce(opts: {
     proposalDeadline: formatDeadlineJST(hoursFromNow(24)),
     rules: game.rules,
     gameUrl,
+    repoUrl,
   });
   console.log(`[start] announcement built (${announcement.length} chars), sending...`);
   try {
@@ -130,11 +131,14 @@ function buildOpeningAnnouncement(opts: {
   proposalDeadline: string;
   rules: string[];
   gameUrl: string | null;
+  repoUrl: string | null;
 }): string {
+  const repoLink = opts.repoUrl ? `<${opts.repoUrl}>` : '公開リポジトリ';
   return [
     `**ゲーム「${opts.gameName}」を開始しました。** (ミニマムノミック / 全 9 条)`,
     ...(opts.gameUrl ? [`📄 進行状況: <${opts.gameUrl}>`] : []),
     'ℹ️ ノミックについて: <https://ja.wikipedia.org/wiki/%E3%83%8E%E3%83%9F%E3%83%83%E3%82%AF>',
+    `⚠️ **このゲームの全記録 (Discord ユーザ名・全提案・全採決・全ルール改変) は公開リポジトリ ${repoLink} に保存されます。** 参加に同意した時点でこれらを公開することに同意したとみなします。`,
     '',
     'ノミックは「ルールを変えていくゲーム」です。プレイヤーは順番にルール改変を提案し、**全員一致**で採択されます。採択されたルールは即座に発効するため、ゲームのあり方そのものが変わっていきます。勝利条件すら最初は定められていません — それも今後の議論で決まります。',
     '',

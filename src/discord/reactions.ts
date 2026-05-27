@@ -81,7 +81,7 @@ async function tallyAndMaybeFinalize(
   const approved = noCount === 0 && yesCount > 0;
   const proposal = game.frontmatter.active_proposal!;
 
-  let updatedGame = readGame(config.gamesDir, game.name);
+  let updatedGame = readGame(config.gamesDir, game.fileStem);
   let commitMessage = '';
 
   if (approved) {
@@ -153,7 +153,7 @@ async function tallyEndConfirmation(message: Message, game: Game, config: Config
 
   const anyNo = game.participants.some((p) => noUsers.has(p.discordId));
   if (anyNo) {
-    const refreshed = readGame(config.gamesDir, game.name);
+    const refreshed = readGame(config.gamesDir, game.fileStem);
     refreshed.frontmatter.pending_end = null;
     writeGame(config.gamesDir, refreshed);
     if (message.channel.isSendable()) {
@@ -165,7 +165,7 @@ async function tallyEndConfirmation(message: Message, game: Game, config: Config
   const allYes = game.participants.every((p) => yesUsers.has(p.discordId));
   if (!allYes) return;
 
-  const refreshed = readGame(config.gamesDir, game.name);
+  const refreshed = readGame(config.gamesDir, game.fileStem);
   const pending = refreshed.frontmatter.pending_end;
   if (!pending) return;
 
