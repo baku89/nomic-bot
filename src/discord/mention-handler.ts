@@ -89,7 +89,6 @@ async function handleStartGame(
     participantMentions: action.participantMentions,
     starterUserId: message.author.id,
     botUserId: message.client.user?.id ?? '',
-    guildId: message.guildId ?? '',
     config,
   });
   if (!result.ok) {

@@ -52,7 +52,6 @@ async function handleStart(
     participantMentions: mentions,
     starterUserId: interaction.user.id,
     botUserId: interaction.client.user.id,
-    guildId: interaction.guildId ?? '',
     config,
   });
 

@@ -13,6 +13,7 @@ import {
   type GameFrontmatter,
 } from './frontmatter.js';
 import { MINIMUM_NOMIC_RULES } from '../initial-rules.js';
+import { getGameByChannel, clearGameFromCache } from './channel-cache.js';
 
 export type Participant = {
   discordId: string;
@@ -69,12 +70,10 @@ export function writeGame(gamesDir: string, game: Game): void {
 }
 
 export function findGameByChannel(gamesDir: string, channelId: string): Game | null {
-  for (const file of listActiveGames(gamesDir)) {
-    const name = file.replace(/\.md$/, '');
-    const game = readGame(gamesDir, name);
-    if (game.frontmatter.discord_channel_id === channelId) return game;
-  }
-  return null;
+  const name = getGameByChannel(channelId);
+  if (!name) return null;
+  if (!gameExists(gamesDir, name)) return null;
+  return readGame(gamesDir, name);
 }
 
 function parseBody(body: string): {
@@ -208,20 +207,18 @@ export function endGame(
   const activePath = join(gamesDir, `${game.name}.md`);
   if (existsSync(activePath)) unlinkSync(activePath);
 
+  clearGameFromCache(game.name);
+
   return { archivePath };
 }
 
 export function createNewGame(opts: {
   name: string;
-  channelId: string;
-  guildId: string;
   participants: Participant[];
 }): Game {
   return {
     name: opts.name,
     frontmatter: {
-      discord_channel_id: opts.channelId,
-      discord_guild_id: opts.guildId,
       status: 'active',
       started_at: new Date().toISOString(),
       current_turn: opts.participants[0]?.discordId ?? null,

@@ -30,8 +30,6 @@ export const pendingEndSchema = z.object({
 export type PendingEnd = z.infer<typeof pendingEndSchema>;
 
 export const gameFrontmatterSchema = z.object({
-  discord_channel_id: z.string(),
-  discord_guild_id: z.string(),
   status: z.enum(['active', 'completed', 'paused']),
   started_at: z.string(),
   current_turn: z.string().nullable(),

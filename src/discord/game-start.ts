@@ -11,6 +11,7 @@ import {
 } from '../game/state.js';
 import { GitGameRepo } from '../git/commit.js';
 import { getGamesRepoUrl, gameFileUrl } from '../game/repo-url.js';
+import { setChannelGame } from '../game/channel-cache.js';
 import { formatDeadlineJST, hoursFromNow } from '../utils/time.js';
 
 export type StartGameResult =
@@ -23,7 +24,6 @@ export async function startGameAndAnnounce(opts: {
   participantMentions: string[];
   starterUserId: string;
   botUserId: string;
-  guildId: string;
   config: Config;
 }): Promise<StartGameResult> {
   if (gameExists(opts.config.gamesDir, opts.name)) {
@@ -55,12 +55,11 @@ export async function startGameAndAnnounce(opts: {
 
   const game = createNewGame({
     name: opts.name,
-    channelId: opts.channel.id,
-    guildId: opts.guildId,
     participants,
   });
   writeGame(opts.config.gamesDir, game);
-  console.log(`[start] wrote ${opts.name}.md`);
+  setChannelGame(opts.channel.id, game.name);
+  console.log(`[start] wrote ${opts.name}.md and cached channel mapping`);
 
   let starterUsername = '';
   try {
