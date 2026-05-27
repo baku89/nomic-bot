@@ -1,3 +1,8 @@
+// Standalone pm2 config for nomic-bot.
+//
+// On a VPS that already uses a central ecosystem (e.g., ~/pm2/ecosystem.config.js
+// for multiple apps), add the same app entry to that file instead and ignore
+// this one. See DEPLOY.md for the central-ecosystem pattern.
 module.exports = {
   apps: [
     {

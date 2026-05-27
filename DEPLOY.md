@@ -104,9 +104,34 @@ git commit --allow-empty -m "VPS 接続テスト"
 git push origin main
 cd ~/nomic-bot
 
-# (7) pm2 を OS 起動時に自動再開
+# (7) 中央 pm2 ecosystem (~/pm2/ecosystem.config.js) に nomic-bot を追加
+# 既に他のアプリで使っている場合は apps 配列に以下のエントリを追記:
+#
+# {
+#   name: 'nomic-bot',
+#   script: '/home/baku/nomic-bot/dist/index.js',
+#   cwd: '/home/baku/nomic-bot',
+#   autorestart: true,
+#   max_memory_restart: '256M',
+#   env: { NODE_ENV: 'production' },
+#   out_file: '/home/baku/nomic-bot/logs/out.log',
+#   error_file: '/home/baku/nomic-bot/logs/err.log',
+#   time: true,
+# }
+#
+# 中央 ecosystem を使わず単独で動かしたい場合は、リポ直下の
+# ecosystem.config.cjs をそのまま使ってよい:
+# pm2 start ecosystem.config.cjs   # 初回のみ
+
+# (8) ビルドして初回起動 (中央 ecosystem 採用時)
+yarn install --frozen-lockfile
+yarn build
+pm2 reload ~/pm2/ecosystem.config.js --only nomic-bot
+pm2 save
+
+# (9) pm2 を OS 起動時に自動再開 (まだなら)
 pm2 startup                    # 出力された sudo コマンドを実行
-# Bot 本体の起動は CI に任せる (次節)
+# 以後の更新は CI に任せる (次節)
 ```
 
 ## 自動デプロイ (これ以降は手動操作不要)
@@ -121,10 +146,10 @@ git push origin main
 1. typecheck + build (CI環境で検証)
 2. VPS に SSH → `git reset --hard origin/main` → `yarn install --frozen-lockfile` → `yarn build`
 3. `yarn register-commands` (スラッシュコマンドの登録/更新)
-4. `pm2 reload nomic-bot` (起動していなければ初回 `pm2 start`)
+4. `pm2 reload ~/pm2/ecosystem.config.js --only nomic-bot --update-env`
 5. `pm2 save`
 
-初回pushでBotが自動起動する。以後の更新もpushだけ。
+初回起動は (8) で済ませる前提なので、以後の `git push` は無停止リロード。
 
 進捗は GitHub の **Actions** タブで見える。手動実行したいときは Actions タブ → "Deploy" → "Run workflow"。
 

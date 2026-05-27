@@ -9,6 +9,6 @@ git reset --hard origin/main
 yarn install --frozen-lockfile
 yarn build
 yarn register-commands
-pm2 reload nomic-bot --update-env || pm2 start ecosystem.config.cjs
+pm2 reload ~/pm2/ecosystem.config.js --only nomic-bot --update-env
 pm2 save
 echo "Deploy complete."
