@@ -9,6 +9,7 @@ import { startGameAndAnnounce } from './game-start.js';
 import { buildProposalMessageContent } from './proposal-message.js';
 import { VOTE_YES, VOTE_NO, VOTE_ABSTAIN } from './reactions.js';
 import { formatDeadlineJST } from '../utils/time.js';
+import { postDispute } from './dispute.js';
 
 export async function handleMention(message: Message, config: Config): Promise<void> {
   const existingGame = findGameByChannel(config.gamesDir, message.channelId);
@@ -193,20 +194,12 @@ async function handleRaiseDispute(
     await message.channel.send('このチャンネルにはゲームがありません。');
     return;
   }
-  const judge = judgeFor(existingGame);
-  if (!judge) {
-    await message.channel.send('裁定者を特定できませんでした (参加者がいません)。');
-    return;
-  }
-  await message.channel.send(
-    [
-      `🚨 **異議申し立て** by <@${message.author.id}>`,
-      `> ${action.reason}`,
-      '',
-      `<@${judge.discordId}> さん、Rule 109 に基づき裁定をお願いします。`,
-      '裁定者の判断は、裁定者を除く全プレイヤーの一致でのみ覆すことができます。',
-    ].join('\n'),
-  );
+  await postDispute({
+    channel: message.channel,
+    game: existingGame,
+    initiator: { mention: `<@${message.author.id}>` },
+    reason: action.reason,
+  });
 }
 
 async function handleStartGame(

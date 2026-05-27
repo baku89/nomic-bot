@@ -20,7 +20,9 @@ import { GitGameRepo } from '../git/commit.js';
 import { formatDeadlineJST, hoursFromNow } from '../utils/time.js';
 import { createLLMProvider } from '../llm/index.js';
 import { checkForWinner } from '../llm/win-check.js';
+import { checkForContradictions } from '../llm/contradiction-check.js';
 import { postEndConfirmation } from './end-confirmation.js';
+import { postDispute } from './dispute.js';
 import { getGamesRepoUrl, gameFileUrl } from '../game/repo-url.js';
 
 export const VOTE_YES = '✅';
@@ -133,8 +135,9 @@ async function tallyAndMaybeFinalize(
   }
 
   if (approved && message.channel.isSendable()) {
+    const llm = createLLMProvider(config);
+
     try {
-      const llm = createLLMProvider(config);
       const winCheck = await checkForWinner(llm, updatedGame);
       if (winCheck.game_should_end) {
         await postEndConfirmation({
@@ -145,9 +148,28 @@ async function tallyAndMaybeFinalize(
           winnerMention: winCheck.winner_mention,
           reason: winCheck.reason,
         });
+        return;
       }
     } catch (err) {
       console.error('[win-check] error:', err);
+    }
+
+    try {
+      const contradiction = await checkForContradictions(llm, updatedGame);
+      if (contradiction.has_contradiction && contradiction.conflicts.length > 0) {
+        const conflictsBlock = contradiction.conflicts
+          .map((c) => `- Rule ${c.rule_numbers.join(', ')}: ${c.description}`)
+          .join('\n');
+        await postDispute({
+          channel: message.channel,
+          game: updatedGame,
+          initiator: 'bot',
+          reason: '直近のルール改変により、ルールセットに矛盾が生じている可能性を検出しました。',
+          conflictsBlock: `**検出された矛盾**:\n${conflictsBlock}${contradiction.notes ? `\n\n所見: ${contradiction.notes}` : ''}`,
+        });
+      }
+    } catch (err) {
+      console.error('[contradiction-check] error:', err);
     }
   }
 }
