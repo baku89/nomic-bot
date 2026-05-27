@@ -29,7 +29,7 @@ export function buildProposalMessageContent(opts: {
   lines.push(`操作: ${opLabel}${targetPart}${newTextPart}`);
   lines.push('');
   lines.push(
-    `参加者全員が ${VOTE_YES} (yes) / ${VOTE_NO} (no) / ${VOTE_ABSTAIN} (棄権) で投票してください。`,
+    `参加者全員が ${VOTE_YES} 賛成 / ${VOTE_NO} 反対 / ${VOTE_ABSTAIN} 棄権 で投票してください。`,
   );
   lines.push(
     `**${opts.deadlineStr} まで**に全員の投票が揃えば即時集計、全員一致 (棄権は除外) で採択されます。`,

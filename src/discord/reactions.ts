@@ -86,11 +86,14 @@ async function tallyAndMaybeFinalize(
 
   let updatedGame = readGame(config.gamesDir, game.fileStem);
   let commitMessage = '';
+  let appliedRuleNumber: number | null = null;
 
   if (approved) {
     try {
-      updatedGame = applyProposal(updatedGame, proposal);
-      commitMessage = formatCommitMessage(proposal, votes, true);
+      const result = applyProposal(updatedGame, proposal);
+      updatedGame = result.game;
+      appliedRuleNumber = result.ruleNumber;
+      commitMessage = formatCommitMessage(proposal, votes, true, appliedRuleNumber);
     } catch (err) {
       if (message.channel.isSendable()) {
         await message.channel.send(
@@ -100,7 +103,7 @@ async function tallyAndMaybeFinalize(
       return;
     }
   } else {
-    commitMessage = formatCommitMessage(proposal, votes, false);
+    commitMessage = formatCommitMessage(proposal, votes, false, null);
   }
 
   advanceTurn(updatedGame);
@@ -111,11 +114,12 @@ async function tallyAndMaybeFinalize(
   await repo.commit(commitMessage);
 
   if (message.channel.isSendable()) {
-    const tallyText = `(yes ${yesCount} / no ${noCount} / 棄権 ${abstainCount})`;
+    const tallyText = `(${VOTE_YES} 賛成 ${yesCount} / ${VOTE_NO} 反対 ${noCount} / ${VOTE_ABSTAIN} 棄権 ${abstainCount})`;
     const lines: string[] = [];
-    if (approved) {
+    if (approved && appliedRuleNumber !== null) {
+      const opVerb = proposal.op === 'enact' ? '制定' : proposal.op === 'modify' ? '修正' : '廃止';
       lines.push(`✅ **採択** — ${proposal.interpretation} ${tallyText}`);
-      lines.push(`ルールブックを更新しました (Rule 106 により即時発効)。`);
+      lines.push(`Rule ${appliedRuleNumber} を${opVerb}しました (Rule 106 により即時発効)。`);
     } else {
       lines.push(`❌ **否決** — ${proposal.interpretation} ${tallyText}`);
     }
@@ -256,19 +260,21 @@ function formatCommitMessage(
   proposal: { interpretation: string; raw_text: string; op: string; target_rule_number: number | null; proposer_id: string; proposer_username: string },
   votes: Record<string, Vote>,
   approved: boolean,
+  appliedRuleNumber: number | null,
 ): string {
   const yes = Object.values(votes).filter((v) => v === 'yes').length;
   const no = Object.values(votes).filter((v) => v === 'no').length;
   const abs = Object.values(votes).filter((v) => v === 'abstain').length;
   const verb = approved ? '採択' : '否決';
   const opLabel = proposal.op === 'enact' ? '制定' : proposal.op === 'modify' ? '修正' : '廃止';
-  const targetPart = proposal.target_rule_number !== null ? ` Rule ${proposal.target_rule_number}` : '';
+  const ruleNum = appliedRuleNumber ?? proposal.target_rule_number;
+  const rulePart = ruleNum !== null ? ` Rule ${ruleNum}` : '';
   const proposer = `\`@${proposal.proposer_username || proposal.proposer_id}\``;
   return [
     `提案 ${verb} by ${proposer}: ${proposal.interpretation}`,
     '',
-    `操作: ${opLabel}${targetPart}`,
-    `投票: yes ${yes} / no ${no} / 棄権 ${abs}`,
+    `操作: ${opLabel}${rulePart}`,
+    `投票: ✅ 賛成 ${yes} / ❌ 反対 ${no} / 🤷 棄権 ${abs}`,
     '',
     `原文: ${proposal.raw_text}`,
   ].join('\n');
