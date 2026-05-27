@@ -12,7 +12,7 @@ import {
   serializeGameFile,
   type GameFrontmatter,
 } from './frontmatter.js';
-import { MINIMUM_NOMIC_RULES } from '../initial-rules.js';
+import { getInitialRules } from '../initial-rules.js';
 import { getGameByChannel, clearGameFromCache } from './channel-cache.js';
 
 export type Participant = {
@@ -241,6 +241,6 @@ export function createNewGame(opts: {
       pending_end: null,
     },
     participants: opts.participants,
-    rules: [...MINIMUM_NOMIC_RULES],
+    rules: getInitialRules(opts.participants.length),
   };
 }
