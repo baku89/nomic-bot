@@ -19,7 +19,7 @@ import {
 } from '../game/state.js';
 import { applyProposal } from '../game/rule-mutations.js';
 import { GitGameRepo } from '../git/commit.js';
-import { formatDeadlineJST, evaluateDeadlineSafe, formatRelativeFromNow } from '../utils/time.js';
+import { evaluateDeadlineSafe } from '../utils/time.js';
 import { createLLMProvider } from '../llm/index.js';
 import { checkForWinner } from '../llm/win-check.js';
 import { checkForContradictions } from '../llm/contradiction-check.js';
@@ -175,7 +175,7 @@ async function tallyAndMaybeFinalize(
       }
       lines.push('');
       lines.push(
-        `<@${turnPlayerId}> さん、あなたの手番です。**${formatRelativeFromNow(deadlineResult.deadline)} (${formatDeadlineJST(deadlineResult.deadline)} まで)** に \`/propose <提案文>\` で提案してください。`,
+        `<@${turnPlayerId}> さん、あなたの手番です。**期限: ${deadlineResult.display}** に \`/propose <提案文>\` で提案してください。`,
       );
       lines.push(`(期限の根拠: ${deadlineResult.reason})`);
       if (judgeId) {

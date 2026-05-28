@@ -29,23 +29,45 @@ export function formatRelativeFromNow(deadline: Date): string {
   return `約${days}日後`;
 }
 
+export type ResolvedDeadline = {
+  raw: string;             // ISO or natural-language condition or fallback ISO
+  asDate: Date | null;     // parsed Date if ISO, otherwise null
+  reason: string;
+  display: string;         // human-readable "約1時間後 (...JST まで)" or "(条件) ..."
+};
+
 export async function evaluateDeadlineSafe(
-  llmEval: () => Promise<{ deadline_iso: string | null; reason: string }>,
+  llmEval: () => Promise<{ deadline: string | null; reason: string }>,
   fallbackHours = 24,
-): Promise<{ deadline: Date; reason: string }> {
+): Promise<ResolvedDeadline> {
   try {
     const res = await llmEval();
-    if (res.deadline_iso) {
-      const d = new Date(res.deadline_iso);
+    if (res.deadline) {
+      const d = new Date(res.deadline);
       if (!isNaN(d.getTime()) && d.getTime() > Date.now()) {
-        return { deadline: d, reason: res.reason };
+        return {
+          raw: res.deadline,
+          asDate: d,
+          reason: res.reason,
+          display: `${formatRelativeFromNow(d)} (${formatDeadlineJST(d)} まで)`,
+        };
       }
+      // Not parseable as ISO — treat as natural-language condition
+      return {
+        raw: res.deadline,
+        asDate: null,
+        reason: res.reason,
+        display: `(条件) ${res.deadline}`,
+      };
     }
   } catch (err) {
     console.error('[rule-engine] deadline evaluation failed, fallback:', err);
   }
+  const d = hoursFromNow(fallbackHours);
   return {
-    deadline: hoursFromNow(fallbackHours),
+    raw: d.toISOString(),
+    asDate: d,
     reason: `(fallback) ${fallbackHours}時間後`,
+    display: `${formatRelativeFromNow(d)} (${formatDeadlineJST(d)} まで)`,
   };
 }

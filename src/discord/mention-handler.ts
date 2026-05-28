@@ -15,7 +15,7 @@ import { postEndConfirmation } from './end-confirmation.js';
 import { startGameAndAnnounce } from './game-start.js';
 import { buildProposalMessageContent } from './proposal-message.js';
 import { VOTE_YES, VOTE_NO, VOTE_ABSTAIN } from './reactions.js';
-import { formatDeadlineJST } from '../utils/time.js';
+import { formatDeadlineJST, formatRelativeFromNow } from '../utils/time.js';
 import { postDispute } from './dispute.js';
 
 export async function handleMention(message: Message, config: Config): Promise<void> {
@@ -181,7 +181,10 @@ async function handleAmendProposal(
     // ignore
   }
 
-  const deadlineStr = formatDeadlineJST(new Date(proposal.vote_deadline));
+  const dl = new Date(proposal.vote_deadline);
+  const deadlineStr = !isNaN(dl.getTime())
+    ? `${formatRelativeFromNow(dl)} (${formatDeadlineJST(dl)} まで)`
+    : `(条件) ${proposal.vote_deadline}`;
   const llm = createLLMProvider(config);
   let eligibleIds: string[] | null = null;
   try {

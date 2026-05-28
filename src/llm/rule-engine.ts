@@ -29,7 +29,9 @@ const eligibleVotersSchema = z.object({
 export type EligibleVotersResult = z.infer<typeof eligibleVotersSchema>;
 
 const deadlineResultSchema = z.object({
-  deadline_iso: z.string().nullable(),
+  // ISO 8601 形式の絶対時刻 (計算可能な場合)、または自然言語の条件 (条件付き/曖昧な場合)、
+  // ルール上期限がないなら null
+  deadline: z.string().nullable(),
   reason: z.string(),
 });
 export type DeadlineResult = z.infer<typeof deadlineResultSchema>;
@@ -163,13 +165,13 @@ export async function evaluateProposalDeadline(
   const systemPrompt = `あなたはノミック (Nomic) ゲームの**提案期限**を判定する役割です。
 現行ルールが定める提案期限を計算し、ISO 8601 絶対時刻で返してください。
 
-- deadline_iso: 期限の ISO 8601 (例: "2026-05-28T11:45:00.000Z")。ルールで期限が一切定められていないなら null。null を返すと無期限になる
-- reason: どのルール (Rule 番号) に基づいたか、計算式 (turn開始時刻 + 1時間 = X など) を説明
+- deadline: 計算可能なら ISO 8601 絶対時刻 (例: "2026-05-28T11:45:00.000Z")。計算不能なら**自然言語の条件文字列** (例: "過半数が投票してから2分後", "吉祥寺で初雨が降るまで")。期限なしなら null
+- reason: どのルール (Rule 番号) に基づいたか、計算式の説明
 
 判定の指針:
-- 現行ルールに「提案は手番が回されてから N 時間 (分) 以内」と書いてあれば、turn開始時刻 + N をそのまま返す
-- ルールに具体的な数値がない場合はデフォルト 24 時間
-- 「条件付き期限」(例: 何かが起きてから N 分以内) は条件発生時刻が未定なので、まずは寛大な仮置き (例: turnStartedAt + 24h) で良い
+- 現行ルールに「提案は手番が回されてから N 時間 (分) 以内」のように**計算可能**な定めがあれば、turn開始時刻 + N の ISO を返す
+- ルールに数値的な定めが**全く無い**場合はデフォルト 24 時間 (ISO)
+- 「条件付き」「event 待ち」のように現時点では時刻に変換できない場合は、ISOではなく**条件を自然言語で**そのまま返す
 - 過去の時刻 (現在より前) を返さないこと
 
 現行ルール:
@@ -194,13 +196,13 @@ export async function evaluateVoteDeadline(
   const systemPrompt = `あなたはノミック (Nomic) ゲームの**投票期限**を判定する役割です。
 現行ルールが定める投票期限を計算し、ISO 8601 絶対時刻で返してください。
 
-- deadline_iso: 期限の ISO 8601。ルールで期限が一切定められていないなら null
+- deadline: 計算可能なら ISO 8601 絶対時刻。計算不能なら**自然言語の条件文字列** (例: "過半数が投票してから2分後", "吉祥寺で雨が降ったら締切")。期限なしなら null
 - reason: どのルール (Rule 番号) に基づいたか、計算式の説明
 
 判定の指針:
-- 現行ルールに「投票は提案から N 時間 (分) 以内」と書いてあれば、提案時刻 + N
-- ルールに具体的な数値がない場合はデフォルト 24 時間
-- 「条件付き期限」(例: 過半数が投票してから N 分以内) は条件未満たしの間は寛大な仮置きで良い
+- 現行ルールに「投票は提案から N 時間 (分) 以内」のように計算可能な定めがあれば、提案時刻 + N の ISO
+- ルールに数値的な定めが**全く無い**場合はデフォルト 24 時間 (ISO)
+- 「event 待ち」や「特定の自然現象まで」など時刻不能なら条件文字列を返す
 - 過去の時刻を返さないこと
 
 現行ルール:

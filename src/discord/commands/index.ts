@@ -14,11 +14,7 @@ import {
   evaluateEligibleVoters,
   evaluateVoteDeadline,
 } from '../../llm/rule-engine.js';
-import {
-  formatDeadlineJST,
-  evaluateDeadlineSafe,
-  formatRelativeFromNow,
-} from '../../utils/time.js';
+import { evaluateDeadlineSafe } from '../../utils/time.js';
 import { VOTE_YES, VOTE_NO, VOTE_ABSTAIN } from '../reactions.js';
 import { startGameAndAnnounce } from '../game-start.js';
 import { buildProposalMessageContent } from '../proposal-message.js';
@@ -150,8 +146,8 @@ async function handlePropose(
   const deadlineResult = await evaluateDeadlineSafe(
     () => evaluateVoteDeadline(llm, game, proposalPostedAt),
   );
-  const voteDeadline = deadlineResult.deadline;
-  const deadlineStr = `${formatRelativeFromNow(voteDeadline)} (${formatDeadlineJST(voteDeadline)} まで)`;
+  const voteDeadlineRaw = deadlineResult.raw;
+  const deadlineStr = deadlineResult.display;
 
   let eligibleIds: string[] | null = null;
   try {
@@ -197,7 +193,7 @@ async function handlePropose(
     interpretation: interp.interpretation,
     raw_text: text,
     proposed_at: new Date().toISOString(),
-    vote_deadline: voteDeadline.toISOString(),
+    vote_deadline: voteDeadlineRaw,
     vote_message_id: proposalMsg.id,
   };
   writeGame(config.gamesDir, game);
