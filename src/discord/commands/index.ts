@@ -10,8 +10,15 @@ import { GitGameRepo } from '../../git/commit.js';
 import { getGamesRepoUrl, gameFileUrl } from '../../game/repo-url.js';
 import { createLLMProvider } from '../../llm/index.js';
 import { interpretProposal } from '../../llm/propose-interpreter.js';
-import { evaluateEligibleVoters } from '../../llm/rule-engine.js';
-import { formatDeadlineJST, hoursFromNow } from '../../utils/time.js';
+import {
+  evaluateEligibleVoters,
+  evaluateVoteDeadline,
+} from '../../llm/rule-engine.js';
+import {
+  formatDeadlineJST,
+  evaluateDeadlineSafe,
+  formatRelativeFromNow,
+} from '../../utils/time.js';
 import { VOTE_YES, VOTE_NO, VOTE_ABSTAIN } from '../reactions.js';
 import { startGameAndAnnounce } from '../game-start.js';
 import { buildProposalMessageContent } from '../proposal-message.js';
@@ -139,8 +146,12 @@ async function handlePropose(
     return;
   }
 
-  const voteDeadline = hoursFromNow(24);
-  const deadlineStr = formatDeadlineJST(voteDeadline);
+  const proposalPostedAt = new Date().toISOString();
+  const deadlineResult = await evaluateDeadlineSafe(
+    () => evaluateVoteDeadline(llm, game, proposalPostedAt),
+  );
+  const voteDeadline = deadlineResult.deadline;
+  const deadlineStr = `${formatRelativeFromNow(voteDeadline)} (${formatDeadlineJST(voteDeadline)} まで)`;
 
   let eligibleIds: string[] | null = null;
   try {

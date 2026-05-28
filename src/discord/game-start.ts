@@ -12,11 +12,12 @@ import {
   type Game,
 } from '../game/state.js';
 import { createLLMProvider } from '../llm/index.js';
-import { evaluateJudge } from '../llm/rule-engine.js';
+import { evaluateJudge, evaluateProposalDeadline } from '../llm/rule-engine.js';
+import { evaluateDeadlineSafe, formatRelativeFromNow } from '../utils/time.js';
 import { GitGameRepo } from '../git/commit.js';
 import { getGamesRepoUrl, gameFileUrl } from '../game/repo-url.js';
 import { setChannelGame } from '../game/channel-cache.js';
-import { formatDeadlineJST, hoursFromNow } from '../utils/time.js';
+import { formatDeadlineJST } from '../utils/time.js';
 
 export type StartGameResult =
   | { ok: true; game: Game }
@@ -84,9 +85,10 @@ export async function startGameAndAnnounce(opts: {
   const repoUrl = await getGamesRepoUrl(opts.config.gamesDir);
   const gameUrl = repoUrl ? gameFileUrl(repoUrl, game.fileStem, false) : null;
 
+  const llm = createLLMProvider(opts.config);
+
   let judgeMention: string | null = null;
   try {
-    const llm = createLLMProvider(opts.config);
     const res = await evaluateJudge(llm, game);
     if (res.player_id && participantById(game, res.player_id)) {
       judgeMention = `<@${res.player_id}>`;
@@ -99,12 +101,18 @@ export async function startGameAndAnnounce(opts: {
     if (fb) judgeMention = mentionOf(fb);
   }
 
+  const deadlineResult = await evaluateDeadlineSafe(
+    () => evaluateProposalDeadline(llm, game, game.frontmatter.started_at),
+  );
+
   const announcement = buildOpeningAnnouncement({
     gameName: game.name,
     participantMentions: participants.map((p) => mentionOf(p)),
     firstPlayerMention: participants[0] ? mentionOf(participants[0]) : '(参加者未指定)',
     judgeMention,
-    proposalDeadline: formatDeadlineJST(hoursFromNow(24)),
+    proposalDeadlineAbs: formatDeadlineJST(deadlineResult.deadline),
+    proposalDeadlineRel: formatRelativeFromNow(deadlineResult.deadline),
+    proposalDeadlineReason: deadlineResult.reason,
     rules: game.rules,
     gameUrl,
     repoUrl,
@@ -149,7 +157,9 @@ function buildOpeningAnnouncement(opts: {
   participantMentions: string[];
   firstPlayerMention: string;
   judgeMention: string | null;
-  proposalDeadline: string;
+  proposalDeadlineAbs: string;
+  proposalDeadlineRel: string;
+  proposalDeadlineReason: string;
   rules: string[];
   gameUrl: string | null;
   repoUrl: string | null;
@@ -175,7 +185,8 @@ function buildOpeningAnnouncement(opts: {
     '',
     '以降は `/status` でゲーム状態とルール一覧を再表示できます。',
     '',
-    `${opts.firstPlayerMention} さん、あなたの手番です。**24時間以内 (${opts.proposalDeadline} まで)** に \`/propose <提案文>\` で提案してください。`,
+    `${opts.firstPlayerMention} さん、あなたの手番です。**${opts.proposalDeadlineRel} (${opts.proposalDeadlineAbs} まで)** に \`/propose <提案文>\` で提案してください。`,
+    `(期限の根拠: ${opts.proposalDeadlineReason})`,
   ].join('\n');
 }
 

@@ -19,7 +19,7 @@ import {
 } from '../game/state.js';
 import { applyProposal } from '../game/rule-mutations.js';
 import { GitGameRepo } from '../git/commit.js';
-import { formatDeadlineJST, hoursFromNow } from '../utils/time.js';
+import { formatDeadlineJST, evaluateDeadlineSafe, formatRelativeFromNow } from '../utils/time.js';
 import { createLLMProvider } from '../llm/index.js';
 import { checkForWinner } from '../llm/win-check.js';
 import { checkForContradictions } from '../llm/contradiction-check.js';
@@ -27,6 +27,7 @@ import {
   evaluateTally,
   evaluateJudge,
   evaluateNextTurn,
+  evaluateProposalDeadline,
 } from '../llm/rule-engine.js';
 import { postEndConfirmation } from './end-confirmation.js';
 import { postDispute } from './dispute.js';
@@ -155,7 +156,10 @@ async function tallyAndMaybeFinalize(
     }
     const turnPlayerId = updatedGame.frontmatter.current_turn;
     if (turnPlayerId) {
-      const nextDeadline = formatDeadlineJST(hoursFromNow(24));
+      const turnStartIso = new Date().toISOString();
+      const deadlineResult = await evaluateDeadlineSafe(
+        () => evaluateProposalDeadline(llm, updatedGame, turnStartIso),
+      );
       let judgeId: string | null = null;
       try {
         const res = await evaluateJudge(llm, updatedGame);
@@ -171,8 +175,9 @@ async function tallyAndMaybeFinalize(
       }
       lines.push('');
       lines.push(
-        `<@${turnPlayerId}> さん、あなたの手番です。**24時間以内 (${nextDeadline} まで)** に \`/propose <提案文>\` で提案してください。`,
+        `<@${turnPlayerId}> さん、あなたの手番です。**${formatRelativeFromNow(deadlineResult.deadline)} (${formatDeadlineJST(deadlineResult.deadline)} まで)** に \`/propose <提案文>\` で提案してください。`,
       );
+      lines.push(`(期限の根拠: ${deadlineResult.reason})`);
       if (judgeId) {
         lines.push(`今手番の裁定者: <@${judgeId}>`);
       }
