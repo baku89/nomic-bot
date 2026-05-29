@@ -14,7 +14,8 @@ import { evaluateJudge, evaluateEligibleVoters } from '../llm/rule-engine.js';
 import { postEndConfirmation } from './end-confirmation.js';
 import { startGameAndAnnounce } from './game-start.js';
 import { buildProposalMessageContent } from './proposal-message.js';
-import { VOTE_YES, VOTE_NO, VOTE_ABSTAIN } from './reactions.js';
+import { VOTE_YES, VOTE_NO, VOTE_ABSTAIN, tallyFromIds } from './reactions.js';
+import { scheduleVoteTally, cancelVoteTally } from './vote-scheduler.js';
 import { formatDeadlineJST, formatRelativeFromNow } from '../utils/time.js';
 import { postDispute } from './dispute.js';
 
@@ -87,7 +88,26 @@ async function executeAction(
     case 'raise_dispute':
       await handleRaiseDispute(action, message, ctx.existingGame, config);
       break;
+    case 'close_voting_now':
+      await handleCloseVoting(message, ctx.existingGame, config);
+      break;
   }
+}
+
+async function handleCloseVoting(
+  message: Message,
+  existingGame: Game | null,
+  config: Config,
+): Promise<void> {
+  if (!message.channel.isSendable()) return;
+  if (!existingGame || !existingGame.frontmatter.active_proposal) {
+    await message.channel.send('進行中の提案がありません。');
+    return;
+  }
+  const proposal = existingGame.frontmatter.active_proposal;
+  await tallyFromIds(message.client, config, message.channelId, proposal.vote_message_id, {
+    force: true,
+  });
 }
 
 async function buildGameContext(
@@ -218,9 +238,19 @@ async function handleAmendProposal(
   await newMsg.react(VOTE_YES);
   await newMsg.react(VOTE_NO);
   await newMsg.react(VOTE_ABSTAIN);
+
+  cancelVoteTally(proposal.vote_message_id);
   proposal.vote_message_id = newMsg.id;
 
   writeGame(config.gamesDir, existingGame);
+
+  scheduleVoteTally(
+    message.client,
+    config,
+    message.channelId,
+    newMsg.id,
+    proposal.vote_deadline,
+  );
 }
 
 async function handleRaiseDispute(

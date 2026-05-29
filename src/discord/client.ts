@@ -4,6 +4,7 @@ import { handleMention } from './mention-handler.js';
 import { handleInteraction } from './commands/index.js';
 import { reportHandlerError } from './error-handler.js';
 import { handleVoteReaction } from './reactions.js';
+import { rescheduleAllPending } from './vote-scheduler.js';
 
 export function logError(tag: string, err: unknown): void {
   if (err instanceof Error) {
@@ -31,6 +32,9 @@ export function createDiscordClient(config: Config): Client {
 
   client.once(Events.ClientReady, (c) => {
     console.log(`[nomic-bot] Logged in as ${c.user.tag} (id: ${c.user.id})`);
+    rescheduleAllPending(client, config).catch((err) =>
+      logError('[vote-scheduler:startup]', err),
+    );
   });
 
   client.on(Events.MessageCreate, async (message) => {

@@ -1,4 +1,5 @@
 import type {
+  Client,
   MessageReaction,
   PartialMessageReaction,
   User,
@@ -32,6 +33,7 @@ import {
 import { postEndConfirmation } from './end-confirmation.js';
 import { postDispute } from './dispute.js';
 import { getGamesRepoUrl, gameFileUrl } from '../game/repo-url.js';
+import { cancelVoteTally } from './vote-scheduler.js';
 
 export const VOTE_YES = '✅';
 export const VOTE_NO = '❌';
@@ -73,18 +75,50 @@ export async function handleVoteReaction(
   }
 }
 
-async function tallyAndMaybeFinalize(
+export async function tallyFromIds(
+  client: Client,
+  config: Config,
+  channelId: string,
+  voteMessageId: string,
+  opts: { force?: boolean } = {},
+): Promise<void> {
+  const game = findGameByChannel(config.gamesDir, channelId);
+  if (!game) {
+    console.warn(`[tally] no game found for channel ${channelId}`);
+    return;
+  }
+  const proposal = game.frontmatter.active_proposal;
+  if (!proposal || proposal.vote_message_id !== voteMessageId) {
+    console.warn(`[tally] no matching active proposal for message ${voteMessageId}`);
+    return;
+  }
+  const channel = await client.channels.fetch(channelId).catch(() => null);
+  if (!channel || !channel.isTextBased()) {
+    console.warn(`[tally] cannot fetch text channel ${channelId}`);
+    return;
+  }
+  const message = await channel.messages.fetch(voteMessageId).catch(() => null);
+  if (!message) {
+    console.warn(`[tally] cannot fetch vote message ${voteMessageId}`);
+    return;
+  }
+  await tallyAndMaybeFinalize(message, game, config, opts);
+}
+
+export async function tallyAndMaybeFinalize(
   message: Message,
   game: Game,
   config: Config,
+  opts: { force?: boolean } = {},
 ): Promise<void> {
+  const force = opts.force === true;
   const votes = await collectVotes(message, game);
   const proposal = game.frontmatter.active_proposal!;
 
   const llm = createLLMProvider(config);
   let tally;
   try {
-    tally = await evaluateTally(llm, game, proposal, votes);
+    tally = await evaluateTally(llm, game, proposal, votes, force);
   } catch (err) {
     console.error('[rule-engine] evaluateTally failed:', err);
     return;
@@ -93,6 +127,8 @@ async function tallyAndMaybeFinalize(
   if (tally.state === 'pending') {
     return;
   }
+
+  cancelVoteTally(proposal.vote_message_id);
 
   const approved = tally.state === 'passed';
 

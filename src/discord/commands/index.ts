@@ -15,9 +15,10 @@ import {
   evaluateVoteDeadline,
 } from '../../llm/rule-engine.js';
 import { evaluateDeadlineSafe } from '../../utils/time.js';
-import { VOTE_YES, VOTE_NO, VOTE_ABSTAIN } from '../reactions.js';
+import { VOTE_YES, VOTE_NO, VOTE_ABSTAIN, tallyFromIds } from '../reactions.js';
 import { startGameAndAnnounce } from '../game-start.js';
 import { buildProposalMessageContent } from '../proposal-message.js';
+import { scheduleVoteTally } from '../vote-scheduler.js';
 
 export async function handleInteraction(
   interaction: ChatInputCommandInteraction,
@@ -35,6 +36,9 @@ export async function handleInteraction(
       break;
     case 'propose':
       await handlePropose(interaction, config);
+      break;
+    case 'close-vote':
+      await handleCloseVote(interaction, config);
       break;
     default:
       await interaction.reply({ content: '不明なコマンドです', ephemeral: true });
@@ -197,6 +201,14 @@ async function handlePropose(
     vote_message_id: proposalMsg.id,
   };
   writeGame(config.gamesDir, game);
+
+  scheduleVoteTally(
+    interaction.client,
+    config,
+    interaction.channelId,
+    proposalMsg.id,
+    voteDeadlineRaw,
+  );
 }
 
 async function handleEnd(
@@ -239,6 +251,40 @@ async function handleEnd(
   if (url) lines.push(`📄 アーカイブ: <${url}>`);
 
   await interaction.reply(lines.join('\n'));
+}
+
+async function handleCloseVote(
+  interaction: ChatInputCommandInteraction,
+  config: Config,
+): Promise<void> {
+  const game = findGameByChannel(config.gamesDir, interaction.channelId);
+  if (!game) {
+    await interaction.reply({
+      content: 'このチャンネルにはアクティブなゲームがありません。',
+      ephemeral: true,
+    });
+    return;
+  }
+  if (!game.participants.some((p) => p.discordId === interaction.user.id)) {
+    await interaction.reply({
+      content: 'このゲームの参加者のみ実行できます。',
+      ephemeral: true,
+    });
+    return;
+  }
+  const proposal = game.frontmatter.active_proposal;
+  if (!proposal || !proposal.vote_message_id) {
+    await interaction.reply({
+      content: '進行中の提案がありません。',
+      ephemeral: true,
+    });
+    return;
+  }
+  await interaction.deferReply({ ephemeral: true });
+  await tallyFromIds(interaction.client, config, interaction.channelId, proposal.vote_message_id, {
+    force: true,
+  });
+  await interaction.editReply('投票を集計しました。');
 }
 
 async function handleStatus(

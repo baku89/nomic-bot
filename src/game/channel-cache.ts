@@ -33,6 +33,10 @@ export function getGameByChannel(channelId: string): string | null {
   return load()[channelId] ?? null;
 }
 
+export function listChannelMappings(): Array<{ channelId: string; fileStem: string }> {
+  return Object.entries(load()).map(([channelId, fileStem]) => ({ channelId, fileStem }));
+}
+
 export function clearGameFromCache(gameName: string): void {
   const m = load();
   let changed = false;

@@ -26,6 +26,9 @@ const commands = [
     .addStringOption((o) =>
       o.setName('reason').setDescription('終了理由 (任意、勝者がいればここに含める)').setRequired(false),
     ),
+  new SlashCommandBuilder()
+    .setName('close-vote')
+    .setDescription('進行中の提案の投票を即時集計する (期限未到来でも可)'),
 ].map((c) => c.toJSON());
 
 const token = process.env.DISCORD_BOT_TOKEN;

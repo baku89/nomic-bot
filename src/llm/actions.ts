@@ -43,6 +43,11 @@ export const raiseDisputeActionSchema = z.object({
   reason: z.string(),
 });
 
+export const closeVotingNowActionSchema = z.object({
+  type: z.literal('close_voting_now'),
+  reason: z.string(),
+});
+
 export const actionSchema = z.discriminatedUnion('type', [
   startGameActionSchema,
   postMessageActionSchema,
@@ -51,6 +56,7 @@ export const actionSchema = z.discriminatedUnion('type', [
   proposeGameEndActionSchema,
   amendActiveProposalActionSchema,
   raiseDisputeActionSchema,
+  closeVotingNowActionSchema,
 ]);
 
 export const llmResponseSchema = z.object({

@@ -51,10 +51,23 @@ export async function evaluateTally(
   game: Game,
   proposal: ActiveProposal,
   votes: Record<string, 'yes' | 'no' | 'abstain' | 'not_voted'>,
+  forceClose = false,
 ): Promise<TallyResult> {
   const votesText = Object.entries(votes)
     .map(([id, v]) => `- ${id}: ${v}`)
     .join('\n');
+  const forceNote = forceClose
+    ? `
+
+**重要: 投票締切処理中** — 投票期限が経過した (または手動で締切が要求された) ため、これは強制集計です。
+- 未投票者 (not_voted) は **棄権 (abstain) とみなして** 現行ルールに従い判定すること
+- 結果は 'passed' か 'rejected' のいずれかに確定させ、'pending' は避ける
+- ただし現行ルールが「未投票=反対」「未投票=賛成」等を明示している場合はそちらに従う`
+    : `
+- 'not_voted' は未投票 (まだ反応待ち)`;
+  const pendingNote = forceClose
+    ? `- 迷う場合でも 'pending' は返さず、最も妥当な判定 (passed/rejected) を返すこと`
+    : `- 迷う場合は 'pending' (誤判定で勝手に採択/否決するより、待つ方がコストが低い)`;
   const systemPrompt = `あなたはノミック (Nomic) ゲームの採決を判定する役割です。
 現行のルールセットと投票状況を見て、提案の状態を判定してください。
 
@@ -85,11 +98,11 @@ ${rulesText(game)}
 
 現在の投票 (Discord User ID: choice):
 ${votesText}
+${forceNote}
 
 注意:
-- 'not_voted' は未投票
 - 採決条件は**必ず現行ルールに基づくこと**。Bot のハードコード挙動 (全会一致) に盲従しない
-- 迷う場合は 'pending' (誤判定で勝手に採択/否決するより、待つ方がコストが低い)`;
+${pendingNote}`;
 
   return llm.generate({
     systemPrompt: systemPrompt + JAPANESE_ONLY,
